@@ -1,0 +1,468 @@
+{
+ "schema": 1,
+ "firm_in_samples": "みなと社労士事務所（架空）",
+ "note": "samples の事務所・数値・事例はすべて架空。型を選ぶ前提の部品IDは scripts/new_deck.py --list の番号",
+ "skins": {
+  "warm": {
+   "label": "あたたかい茶（既定）",
+   "css_vars": {},
+   "apply": "生成した HTML の <style> の末尾に :root{...} として追記する（samples は追記済み）"
+  },
+  "navy": {
+   "label": "落ち着いた紺",
+   "css_vars": {
+    "--page-bg": "#f2f2f0",
+    "--ink": "#050505",
+    "--navy": "#071b2c",
+    "--accent": "#1e5f8c",
+    "--cyan": "#79c8dc",
+    "--muted": "#666b70",
+    "--rule": "#b9bec3",
+    "--hairline": "#d9dcdf",
+    "--soft": "#e7f4f8",
+    "--rose": "#d94c68",
+    "--blue": "#1e5f8c",
+    "--green": "#00856f",
+    "--warning": "#e0b22e",
+    "--soft-blue": "#e7f4f8",
+    "--soft-yellow": "#fff3bd"
+   },
+   "apply": "生成した HTML の <style> の末尾に :root{...} として追記する（samples は追記済み）"
+  },
+  "mono": {
+   "label": "墨色（モノクロ）",
+   "css_vars": {
+    "--page-bg": "#f4f4f4",
+    "--ink": "#222222",
+    "--navy": "#222222",
+    "--accent": "#444444",
+    "--cyan": "#a8a8a8",
+    "--muted": "#767676",
+    "--rule": "#b8b8b8",
+    "--hairline": "#dddddd",
+    "--soft": "#f0f0f0",
+    "--rose": "#a22727",
+    "--blue": "#444444",
+    "--green": "#444444",
+    "--warning": "#999999",
+    "--soft-blue": "#eeeeee",
+    "--soft-yellow": "#f6f6f6"
+   },
+   "apply": "生成した HTML の <style> の末尾に :root{...} として追記する（samples は追記済み）"
+  }
+ },
+ "density": {
+  "read": {
+   "label": "配る資料（部品の既定の文字サイズ）",
+   "css": ""
+  },
+  "talk": {
+   "label": "話す資料（文字を約1.3倍に）",
+   "css": ".s table,.s .rows .r,.s .toc .ti{font-size:15pt}.s th,.s td.ax,.s .rows .l,.s .two .colh,.s .axh{font-size:17pt}.s .two .colh,.s .axh{height:9mm}.s .two ul,.s .bd{font-size:14pt}.s .chev .n,.s .chev .t{font-size:14pt}.s .chev .x{font-size:12pt}.s .src{font-size:9pt}.s h1{font-size:26pt}.s .h{font-size:14pt}.slide .imp-title{font-size:30px}.slide .imp-copy{font-size:23px}"
+  }
+ },
+ "kata": [
+  {
+   "id": "seminar",
+   "name": "セミナー",
+   "when": "講演・登壇で、前に立って話しながら投影する資料（経営者・総務担当向けなど）",
+   "fits": "講演・セミナー・勉強会・説明会（登壇して話す場面全般）",
+   "audience": "経営者・総務担当（制度に詳しくない）",
+   "slides": {
+    "typical": "12-16",
+    "min": 8,
+    "max": 24,
+    "note": "60分で 12-16 枚が目安。1枚 3-5分。章扉は枚数に数えない考え方もできる"
+   },
+   "mode": "話す",
+   "density": "talk",
+   "density_note": "話す資料: 1枚の文字は短い句にとどめ、説明は読み原稿（notes）へ。文字を大きくする density.talk を使う。配布が要るなら別に PDF を作るか、チェック表の枚を配る",
+   "tone": "です・ます（話し言葉に近い）。タイトルは言い切り。数字と制度は台帳にあるものだけ。『今日のゴール』を冒頭で言い、最後は持ち帰りを3つに絞る。流れは『何が変わったか→自分に関係あるか→何をすればよいか』",
+   "flow": "聴衆は問題意識がまだ無い前提。結論は最初の数枚（目次・背景）で出し、途中で席を立たれても持ち帰りが分かるようにする",
+   "default_skin": "warm",
+   "skins": [
+    "warm",
+    "navy"
+   ],
+   "notes_required": true,
+   "parts": "b01,b03,b04,b06,b07,b04,b05,b08,b26,b09,b04,b02,b04,b10",
+   "sequence": [
+    {
+     "n": 1,
+     "part": "b01",
+     "role": "表紙",
+     "example_title": null
+    },
+    {
+     "n": 2,
+     "part": "b03",
+     "role": "目次",
+     "example_title": "今日の話は3つの順で進める"
+    },
+    {
+     "n": 3,
+     "part": "b04",
+     "role": "章扉（01）",
+     "example_title": null
+    },
+    {
+     "n": 4,
+     "part": "b06",
+     "role": "背景（何が変わったか）",
+     "example_title": "働き方の決まりが変わり、就業規則が古くなりやすい"
+    },
+    {
+     "n": 5,
+     "part": "b07",
+     "role": "自分に関係あるか",
+     "example_title": "従業員が10人以上なら、就業規則が必要になる"
+    },
+    {
+     "n": 6,
+     "part": "b04",
+     "role": "章扉（02）",
+     "example_title": null
+    },
+    {
+     "n": 7,
+     "part": "b05",
+     "role": "手順（進め方）",
+     "example_title": "見直しは4つの順で進めると、抜けが出ない"
+    },
+    {
+     "n": 8,
+     "part": "b08",
+     "role": "要点（見直しの4点）",
+     "example_title": "見直しで抜けやすいのは、この4つ"
+    },
+    {
+     "n": 9,
+     "part": "b26",
+     "role": "課題と打ち手",
+     "example_title": "課題は3つに分けると、順番に手を打てる"
+    },
+    {
+     "n": 10,
+     "part": "b09",
+     "role": "チェック表（持ち帰り用）",
+     "example_title": "自社の状態は、この表で5分あれば確認できる"
+    },
+    {
+     "n": 11,
+     "part": "b04",
+     "role": "章扉（03）",
+     "example_title": null
+    },
+    {
+     "n": 12,
+     "part": "b02",
+     "role": "まとめ（持ち帰り3つ）",
+     "example_title": "持ち帰りは3つで、今日のうちに手をつけられる"
+    },
+    {
+     "n": 13,
+     "part": "b04",
+     "role": "Q&A",
+     "example_title": null
+    },
+    {
+     "n": 14,
+     "part": "b10",
+     "role": "連絡先",
+     "example_title": null
+    }
+   ],
+   "sample": "seminar/sample.html",
+   "preview": "seminar/preview.png",
+   "optional_parts": {
+    "note": "下の部品は現状 pptx 書き出しで文字が約1.25倍に膨らむ（README 既知の問題）ため、サンプルでは使っていない。不具合が直るまでは追加しない",
+    "ids": "m01 m10 m12 m21 m22 m26 m35"
+   }
+  },
+  {
+   "id": "advisory",
+   "name": "顧問先説明",
+   "when": "顧問先の経営者・人事担当へ、制度の変更や規程の改定を説明する資料（会議で見せ、そのまま回覧もされる）",
+   "fits": "制度・法改正の説明、就業規則の改定説明、手続きの案内、社内ルール変更の説明",
+   "audience": "顧問先の経営者・人事担当（制度の細部は知らない）",
+   "slides": {
+    "typical": "8-12",
+    "min": 6,
+    "max": 16,
+    "note": "会議で10-20分、または読むだけで10分で終わる量"
+   },
+   "mode": "両方（会議で説明＋回覧）",
+   "density": "read",
+   "density_note": "配る寄り: 単体で読んで論拠が分かる密度。表と箇条書きを使う。迷ったら『配る』側に倒す（同席しない人に回覧される）",
+   "tone": "です・ます。結論を先に、理由、何をいつまでに。制度の根拠は [要確認] を付け、基準日を表紙に書く。専門用語は1回ずつ言い換える",
+   "flow": "頼まれて説明する立場。結論→背景→制度の中身→影響→手順→お願い→決めてほしいこと",
+   "default_skin": "navy",
+   "skins": [
+    "navy",
+    "warm"
+   ],
+   "notes_required": false,
+   "parts": "b01,b02,b06,b09,b26,b11,b09,b05,b08,b26,b10",
+   "sequence": [
+    {
+     "n": 1,
+     "part": "b01",
+     "role": "表紙",
+     "example_title": null
+    },
+    {
+     "n": 2,
+     "part": "b02",
+     "role": "結論（先に言う）",
+     "example_title": "結論：就業規則を3点改定し、年内に周知まで終える"
+    },
+    {
+     "n": 3,
+     "part": "b06",
+     "role": "背景（制度の動き）",
+     "example_title": "制度の見直しで、規程に書く内容が増える"
+    },
+    {
+     "n": 4,
+     "part": "b09",
+     "role": "制度の説明（表）",
+     "example_title": "制度の中身は、内容・対象・注意点の3つで整理できる"
+    },
+    {
+     "n": 5,
+     "part": "b26",
+     "role": "現行と改定案の比較",
+     "example_title": "現行の規程と改定案の差は、3か所に絞れる"
+    },
+    {
+     "n": 6,
+     "part": "b11",
+     "role": "事例（任意）",
+     "example_title": "従業員20人の小売業（架空）は、2か月で改定を終えた"
+    },
+    {
+     "n": 7,
+     "part": "b09",
+     "role": "リスク（対応しないと）",
+     "example_title": "対応しないと、申出を断る誤りが起きうる"
+    },
+    {
+     "n": 8,
+     "part": "b05",
+     "role": "手順・日程",
+     "example_title": "改定は4段階で、約2か月を見込む"
+    },
+    {
+     "n": 9,
+     "part": "b08",
+     "role": "お願いしたいこと",
+     "example_title": "御社にお願いしたいのは、この4つ"
+    },
+    {
+     "n": 10,
+     "part": "b26",
+     "role": "決めてほしいこと（まとめ）",
+     "example_title": "決めていただきたいのは、担当者と説明日"
+    },
+    {
+     "n": 11,
+     "part": "b10",
+     "role": "連絡先",
+     "example_title": null
+    }
+   ],
+   "sample": "advisory/sample.html",
+   "preview": "advisory/preview.png",
+   "optional_parts": {
+    "note": "下の部品は現状 pptx 書き出しで文字が約1.25倍に膨らむ（README 既知の問題）ため、サンプルでは使っていない。不具合が直るまでは追加しない",
+    "ids": "m01 m10 m12 m21 m22 m26 m35"
+   }
+  },
+  {
+   "id": "proposal",
+   "name": "提案",
+   "when": "見込み客・新規の相手に、サービスや契約を提案する資料（面談で見せ、後で読み返される）",
+   "fits": "顧問契約・スポット契約の提案、新サービスの提案、規程整備の見積り提案",
+   "audience": "見込み客の経営者（まだ契約していない）",
+   "slides": {
+    "typical": "9-13",
+    "min": 7,
+    "max": 16,
+    "note": "面談30分で10枚前後。費用と進め方を必ず入れる"
+   },
+   "mode": "両方（面談で説明＋後で読まれる）",
+   "density": "read",
+   "density_note": "配る寄りで、面談でも使える密度。決めてほしいことを最後の1枚に出す",
+   "tone": "です・ます。相手の言葉（面談メモ）で困りごとを書く。誇張・成果の約束はしない。金額・実績は台帳にあるものだけ、無ければ [金額は未定] / [要確認]。実績は同意を得た事例だけ",
+   "flow": "相手は必要性に合意していない前提。相手の困りごと→解決の要点→中身→進め方と費用→決めてほしいこと",
+   "default_skin": "navy",
+   "skins": [
+    "navy",
+    "mono"
+   ],
+   "notes_required": false,
+   "parts": "b01,b02,b26,b19,b09,b09,b05,b09,b11,b26,b10",
+   "sequence": [
+    {
+     "n": 1,
+     "part": "b01",
+     "role": "表紙",
+     "example_title": null
+    },
+    {
+     "n": 2,
+     "part": "b02",
+     "role": "相手の状況と困りごと（SCR）",
+     "example_title": "困りごとの原因は、規程と運用のずれにある"
+    },
+    {
+     "n": 3,
+     "part": "b26",
+     "role": "困りごとと打ち手",
+     "example_title": "困りごとごとに、打つ手を1つずつ決める"
+    },
+    {
+     "n": 4,
+     "part": "b19",
+     "role": "提案の全体像（柱）",
+     "example_title": "提案は4つの柱と、共通の土台でできている"
+    },
+    {
+     "n": 5,
+     "part": "b09",
+     "role": "サービス内容（範囲・頻度・成果物）",
+     "example_title": "サービスの範囲・頻度・成果物を、一覧で示す"
+    },
+    {
+     "n": 6,
+     "part": "b09",
+     "role": "選択肢の比較",
+     "example_title": "契約は3通りあるが、まず小さく始める形を勧める"
+    },
+    {
+     "n": 7,
+     "part": "b05",
+     "role": "進め方",
+     "example_title": "進め方は、面談から3か月で運用に乗せる"
+    },
+    {
+     "n": 8,
+     "part": "b09",
+     "role": "費用",
+     "example_title": "費用は範囲ごとに固定額で示す"
+    },
+    {
+     "n": 9,
+     "part": "b11",
+     "role": "事例（任意）",
+     "example_title": "同規模の製造業（架空）では、相談が月1回に集約された"
+    },
+    {
+     "n": 10,
+     "part": "b26",
+     "role": "決めてほしいこと（まとめ）",
+     "example_title": "お決めいただきたいのは、契約の形と開始時期"
+    },
+    {
+     "n": 11,
+     "part": "b10",
+     "role": "連絡先",
+     "example_title": null
+    }
+   ],
+   "sample": "proposal/sample.html",
+   "preview": "proposal/preview.png",
+   "optional_parts": {
+    "note": "下の部品は現状 pptx 書き出しで文字が約1.25倍に膨らむ（README 既知の問題）ため、サンプルでは使っていない。不具合が直るまでは追加しない",
+    "ids": "m01 m10 m12 m21 m22 m26 m35"
+   }
+  },
+  {
+   "id": "report",
+   "name": "報告",
+   "when": "顧問先への定期報告・調査や診断の結果報告（受け取った人が後で読み返す）",
+   "fits": "労務診断の結果報告、月次・四半期の報告、アンケート・調査結果の報告、手続きの進捗報告",
+   "audience": "顧問先の経営者・担当者（結果と次の行動を知りたい）",
+   "slides": {
+    "typical": "7-12",
+    "min": 5,
+    "max": 16,
+    "note": "1回の報告で 7-12 枚。数字が多ければ付録に回す"
+   },
+   "mode": "配る",
+   "density": "read",
+   "density_note": "配る資料: 文字が多いのは欠点ではない。結論→根拠の順で、数値は表にして出典と期間を書く",
+   "tone": "です・ます（または言い切りで統一）。淡々と事実→所見→次にやること。数値は出典と期間つき、台帳にあるものだけ。助言は『〜が望ましい』と根拠を添える。良くない結果も先に書く",
+   "flow": "頼まれて報告する立場。結論→調べ方→結果→所見・要対応→進捗→次回の予定",
+   "default_skin": "mono",
+   "skins": [
+    "mono",
+    "warm"
+   ],
+   "notes_required": false,
+   "parts": "b01,b02,b25,b07,b26,b09,b09,b05,b10",
+   "sequence": [
+    {
+     "n": 1,
+     "part": "b01",
+     "role": "表紙",
+     "example_title": null
+    },
+    {
+     "n": 2,
+     "part": "b02",
+     "role": "結論（先に言う）",
+     "example_title": "結論：残業の申請ルールを先に整える"
+    },
+    {
+     "n": 3,
+     "part": "b25",
+     "role": "調べ方",
+     "example_title": "今回は、勤怠データと聞き取りの2つで調べた"
+    },
+    {
+     "n": 4,
+     "part": "b07",
+     "role": "結果（数値）",
+     "example_title": "残業は営業部に偏り、製造部の約2倍に達している"
+    },
+    {
+     "n": 5,
+     "part": "b26",
+     "role": "所見と次にやること",
+     "example_title": "所見は3つあり、次の四半期にやることを対にした"
+    },
+    {
+     "n": 6,
+     "part": "b09",
+     "role": "要対応事項",
+     "example_title": "要対応は3件で、うち1件は期限を決めて直す"
+    },
+    {
+     "n": 7,
+     "part": "b09",
+     "role": "手続き・進捗の一覧",
+     "example_title": "手続きの状況を、完了と進行中に分けて一覧にした"
+    },
+    {
+     "n": 8,
+     "part": "b05",
+     "role": "次回までの予定",
+     "example_title": "次回の報告までに、申請ルールの運用を始める"
+    },
+    {
+     "n": 9,
+     "part": "b10",
+     "role": "連絡先",
+     "example_title": null
+    }
+   ],
+   "sample": "report/sample.html",
+   "preview": "report/preview.png",
+   "optional_parts": {
+    "note": "下の部品は現状 pptx 書き出しで文字が約1.25倍に膨らむ（README 既知の問題）ため、サンプルでは使っていない。不具合が直るまでは追加しない",
+    "ids": "m01 m10 m12 m21 m22 m26 m35"
+   }
+  }
+ ]
+}
