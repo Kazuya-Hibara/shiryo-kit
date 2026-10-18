@@ -21,18 +21,23 @@
   | Codex | **ChatGPT の有料プラン** (個人なら Plus か Pro、会社なら Business・Enterprise・Edu)。公式には無料・Go のプランにも含まれますが、使える範囲とモデルが限られ、おすすめのモデル (下の §3) が使えるかは確かめていません |
 
   - 金額は各社がよく変えるので、ここには書きません。申し込みは、Claude なら claude.ai、ChatGPT なら chatgpt.com にログインすると出る「アップグレード」(Upgrade) の案内からします。
-  - 入れ方 (公式の案内。英語のページです。ブラウザの翻訳機能で日本語にして読めます): Claude Code は https://code.claude.com/docs/en/desktop-quickstart (デスクトップアプリ) と https://code.claude.com/docs/en/setup (文字で操作する版)。Codex は https://learn.chatgpt.com/docs/pricing (契約と使える範囲)。
-- **この shiryo-kit のフォルダ。** GitHub の shiryo-kit のトップページ (README が表示されるページ) の上の方にある緑色の「Code」ボタン →「Download ZIP」で取り、ZIP を開いて (展開して) ください。
+  - 入れ方 (公式の案内):
+    - Claude Code: **ターミナル (黒い画面) を使ったことがない方は、デスクトップアプリ** を入れてください。「デスクトップアプリを始める」https://code.claude.com/docs/ja/desktop-quickstart (日本語のページ。公式にも「ターミナルを使用せずに」使えると書いてあります)。文字で操作する版は「高度なセットアップ」https://code.claude.com/docs/ja/setup 。
+    - Codex: いまは ChatGPT のデスクトップアプリの中で使います (アプリの中で ChatGPT か Codex を選びます)。入れ方は「ChatGPT desktop app」https://learn.chatgpt.com/docs/app (英語のページです。ブラウザの翻訳機能で日本語にして読めます)。文字で操作する版は「Codex CLI」https://learn.chatgpt.com/docs/codex/cli 。契約と使える範囲は https://learn.chatgpt.com/docs/pricing 。
+- **この shiryo-kit のフォルダ。** GitHub の shiryo-kit の **いちばん上のページ** (このページを GitHub で見ているなら、ページの上の方にある「shiryo-kit」の文字を押すと戻れます) の、緑色の「Code」ボタン →「Download ZIP」で取り、ZIP を開いて (展開して) ください。展開すると、ふつうは `shiryo-kit-main` という名前のフォルダができます。
 
 ### 1. shiryo-kit を入れる
 
 やり方は 2 つあります。どちらも、することは同じです。
 
 **やり方 A — AI に頼む (おすすめ)**
-Claude Code か Codex を、展開したフォルダで開きます。デスクトップアプリなら、フォルダを選ぶ画面でこのフォルダを選びます。開いたら、次のように頼みます。
+Claude Code か Codex を、展開したフォルダ (`shiryo-kit-main` など) で開きます。Claude のデスクトップアプリなら、上の「Code」タブで「Select folder」を押して、このフォルダを選びます。ChatGPT のデスクトップアプリ (Codex) なら、Codex を選んでフォルダを開きます。開いたら、次のように頼みます。
 
 - Claude Code なら「このフォルダの install.sh を --claude を付けて実行して」(Windows は「install.ps1 を -Claude を付けて実行して」)
 - Codex なら「このフォルダの install.sh を --codex を付けて実行して」(Windows は「install.ps1 を -Codex を付けて実行して」)
+
+AI がコマンドを実行してよいかを確かめてきたら、許可してください (Codex は、作業中のフォルダの外 (スキルの置き場所) に書き込むので、たいてい確かめてきます)。
+うまくいくと、AI の返事か画面に「[Claude Code] コピーしました: …」(または「[Codex] コピーしました: …」、2 回目以降は「新しい版に入れ替えました」) と「終わりました。」が出ます。「止めました」と出た時は、下の「うまくいかない時」をご覧ください。
 
 **やり方 B — 自分でコマンドを打つ**
 
@@ -90,7 +95,7 @@ AI には種類 (モデル) と、どれだけ考えてから答えるか (effor
 
 ### はじめて
 
-1. 資料を置きたいフォルダ (例: `書類/資料づくり`) で Claude Code か Codex を開きます。過去の資料 (pptx・pdf・Word) があれば、このフォルダに入れておくか、場所を伝えてください。
+1. 資料を置くためのフォルダを、shiryo-kit のフォルダとは別に新しく作ります (例:「書類」の中に「資料づくり」)。展開した shiryo-kit のフォルダの中では作業しません。そのフォルダで Claude Code か Codex を開きます。過去の資料 (pptx・pdf・Word) があれば、このフォルダに入れておくか、場所を伝えてください。
 2. ふつうの言葉で頼みます。
    - 「セミナー資料を作りたい」
    - 「顧問先に、来年の制度の変更を説明する資料がほしい」
@@ -227,8 +232,8 @@ OpenAI の同じような機能 (Codex の Presentations) は、この道具で�
 |---|---|---|---|---|
 | Claude のデスクトップアプリ (Code の画面) — Mac・Windows | Claude の Pro・Max・Team・Enterprise | やり方 A か `install.sh --claude` / `install.ps1 -Claude` | 画面で指して直す: 未確認 | 未検証 |
 | Claude Code (文字で操作する版) — Mac・Linux・Windows | 上の契約か、API の契約。無料プランでは使えません | 同上 | 画面で指して直す機能は無い (言葉で直す)。Windows の install.ps1 は一度も動かしていない | 未検証 |
-| ChatGPT のデスクトップアプリ (Codex) — Mac・Windows | ChatGPT の契約 (おすすめのモデルが無料・Go で使えるかは未確認) | やり方 A か `install.sh --codex` / `install.ps1 -Codex` | 画面で指して直す (Annotate): 未確認。会社の管理設定で制限されることがある | 未検証 |
-| Codex (文字で操作する版) — Mac・Linux・Windows | 上の契約か、API の契約 | 同上 | 画面で指して直す機能は無い (言葉で直す)。原典を取りに行く時、ネットへの接続の許可を求められることがある | 未検証 |
+| ChatGPT のデスクトップアプリ (Codex) — Mac・Windows | ChatGPT の契約 (おすすめのモデルが無料・Go で使えるかは未確認) | やり方 A か `install.sh --codex` / `install.ps1 -Codex` | 画面で指して直す (Annotate): 未確認。会社の管理設定で制限されることがある。書き出しと点検の時に、囲いの外で動かしてよいかの許可を求められる (下の行と同じ) | 未検証 |
+| Codex (文字で操作する版) — Mac・Linux・Windows | 上の契約か、API の契約 | 同上 | 画面で指して直す機能は無い (言葉で直す)。原典を取りに行く時、ネットへの接続の許可を求められることがある。PowerPoint・PDF の書き出しと別の AI による点検の時に、Codex の安全のための囲いの外で動かしてよいかの許可を求められる (許可しないと「pptx はまだ作れていません」「未検品」になる) | 未検証 |
 | (任意) Claude Slides で仕上げる | claude.ai にログインした Claude Code (Pro・Max・Team・Enterprise) | 追加の設定なし。頼んだ時だけ使う | 内容が claude.ai に保存される。書き出した PowerPoint が直せる形か・日本語の書体は未確認 | 未検証 |
 | Codex の Presentations | — | — | 案内しない (中で使われている部品の利用条件が「内部の評価・試験目的のみ、商用不可」のため) | 対象外 |
 

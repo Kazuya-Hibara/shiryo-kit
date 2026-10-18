@@ -9,7 +9,7 @@ check.py review-evidence / check.py manifest がこの記録を読む（形は r
   python3 review_record.py finish review --round 1 --reviewer-id <subagent の id> [--exit 0] [--transcript <実行記録の file>]
 
   # 別プロセス（codex exec / claude -p）で検品する時: run が起動・時刻・pid・終了コード・出力を全部記録する
-  python3 review_record.py run review --round 1 --stdin review/request-1.md -- codex exec --json --skip-git-repo-check -C . -s workspace-write -o review/last-1.md -
+  python3 review_record.py run review --round 1 --stdin review/request-1.md -- codex exec --json --skip-git-repo-check -C . -s workspace-write -m gpt-6-astra -c model_reasoning_effort="high" -o review/last-1.md -
 
   python3 review_record.py show review --round 1      # 記録を表示
 
@@ -17,7 +17,8 @@ check.py review-evidence / check.py manifest がこの記録を読む（形は r
   method（subagent / fresh-process）・started_at / ended_at（この script が時計から取る）・inputs（BRIEF.md・ledger.md・deck.html の
   3 つだけ）と start の時点の sha256・依頼文 review/request-<n>.md の sha256・reviewer_id・exit_status・結果 review/review-<n>.md の
   sha256 と更新時刻・run の時は pid と出力（review/run-<n>.jsonl）の sha256。
-start の前に review/request-<n>.md を書いておく（無いと止まる）。finish は review/review-<n>.md が無いと止まる。
+start の前に review/request-<n>.md を書いておく（無いと止まる。references/review.md の雛形に無い行があっても止まる）。
+finish は review/review-<n>.md が無いと止まる。
 """
 import argparse
 import datetime
@@ -33,6 +34,8 @@ from pathlib import Path
 SCHEMA = "shiryo-kit/review-independence/v1"
 RECORDER = "shiryo-kit/scripts/review_record.py"
 INPUT_NAMES = {"brief": "BRIEF.md", "ledger": "ledger.md", "deck": "deck.html"}
+TEMPLATE_DOC = Path(__file__).resolve().parent.parent / "references" / "review.md"
+CODEX_ENV_KEYS = ("CODEX_SANDBOX", "CODEX_SANDBOX_NETWORK_DISABLED", "CODEX_THREAD_ID")
 
 
 def now():
@@ -79,6 +82,69 @@ def save(review_dir, n, rec):
     return p
 
 
+# 雛形の埋め字ごとに、入ってよい物の形（作り手の観点を埋め字に紛れ込ませないため）
+_PATH = r"[^。、「」\n]+?"
+_FILE = r"[^\s。、「」（）()]+\.[A-Za-z0-9]+"
+SLOTS = {
+    "<n>": r"\d+",
+    "<BRIEF の spec_rev をそのまま>": r"\d+",
+    "<案件フォルダ>": _PATH,
+    "<skill>": _PATH,
+    "<案件>": r"[^。、「」\n]+?",
+    "<名前>": r"[^\s/\\。、「」]+",
+    "<ほかの成果物>": rf"(?:{_FILE}(?:\s+{_FILE})*)?",
+}
+
+
+def _literal(text):
+    """雛形の地の文: 空白の数は問わず、/ は Windows の \\ でもよい。"""
+    return re.escape(text).replace(r"\ ", r"\s*").replace("/", r"[\\/]")
+
+
+def _template_patterns(names=None):
+    """references/review.md の依頼文の雛形の各行を正規表現にする（<…> は SLOTS の形、/ は \\ も可）。
+    names = {"BRIEF.md": 実際の名前, …}（--brief 等で別の名前を渡した時）。"""
+    try:
+        doc = TEMPLATE_DOC.read_text(encoding="utf-8")
+    except OSError as e:
+        die(f"依頼文の雛形 {TEMPLATE_DOC} が読めない（{e}）")
+    m = re.search(r"## reviewer への依頼文.*?```markdown\n(.*?)\n```", doc, re.S)
+    if not m:
+        die(f"{TEMPLATE_DOC} に依頼文の雛形が見つからない")
+    pats = []
+    for line in m.group(1).splitlines():
+        line = " ".join(line.split())
+        if not line:
+            continue
+        for default, actual in (names or {}).items():
+            line = line.replace(default, actual)
+        # 当てはまらない物は消してよい（pptx が無い時の「・out/ の file」）。書き換えは認めない
+        for variant in {line, line.replace("・out/ の file", "")}:
+            out, pos = [], 0
+            for mm in re.finditer(r"<[^<>]*>", variant):
+                out.append(_literal(variant[pos:mm.start()]))
+                out.append(SLOTS.get(mm.group(0), r"[^\n]+?"))
+                pos = mm.end()
+            out.append(_literal(variant[pos:]))
+            pats.append(re.compile("".join(out)))
+    return pats
+
+
+def request_deviations(request_file, names=None):
+    """依頼文の中で、雛形のどの行にも当てはまらない行（作り手の観点・説明が reviewer に移る所）と、埋めていない <…>。"""
+    pats = _template_patterns(names)
+    out = []
+    for line in Path(request_file).read_text(encoding="utf-8", errors="replace").splitlines():
+        s = " ".join(line.split())
+        if not s:
+            continue
+        if re.search(r"<[^<>]*>", s):
+            out.append(f"{s}  ← <…> を埋めていない")
+        elif not any(p.fullmatch(s) for p in pats):
+            out.append(s)
+    return out
+
+
 def cmd_start(a, method=None):
     review_dir = Path(a.review_dir)
     review_dir.mkdir(parents=True, exist_ok=True)
@@ -101,6 +167,12 @@ def cmd_start(a, method=None):
             die(f"検品に渡す file が無い: {f}")
         inputs[key] = os.path.relpath(f, case)
         hashes[key] = sha256(f)
+    extra = request_deviations(ps["request"], {INPUT_NAMES[k]: Path(v).name for k, v in inputs.items()})
+    if extra:
+        die(f"依頼文 {ps['request']} に、雛形（references/review.md §reviewer への依頼文）に無い行がある。"
+            "作り手の観点・説明・目安の時間を reviewer に渡さないため、雛形の <…> を埋めるだけにして書き直す"
+            "（当てはまらない行は書き換えずに消す。例: pptx が無い時の check.py pptx の行）:\n  "
+            + "\n  ".join(extra))
     rec = {
         "schema": SCHEMA,
         "recorder": RECORDER,
@@ -110,6 +182,8 @@ def cmd_start(a, method=None):
         "started_at": now(),
         "ended_at": None,
         "host": platform.node(),
+        # Codex の囲いの中で動く command には CODEX_SANDBOX などが入る（値は記録しない。有無だけ）
+        "codex_env": any(k in os.environ for k in CODEX_ENV_KEYS),
         "inputs": inputs,
         "inputs_sha256": hashes,
         "request_file": ps["request"].name,

@@ -28,7 +28,7 @@ compatibility: >-
 
 次の 6 つは、利用者の頼み方・時間の都合・モデルの自信に関係なく守る。破りそうな時は止まって利用者に状況を伝える。
 
-- **関門 1 — 承認前に作らない。** BRIEF.md に本人の承認記録 (日時と本人の言葉) が入るまで、スライド・原稿・骨子の本文を書かない。「いいから作って」と言われても、止める項目 (目的・受け手・成果物) を推奨答つきで一度に示し、承認を一言もらう。黙っていた・返事が無いのは承認ではない。
+- **関門 1 — 承認前に作らない。** BRIEF.md に本人の承認記録 (日時と本人の言葉) が入るまで、スライド・原稿・骨子の本文を書かない。「いいから作って」と言われても、止める項目 (目的・受け手・成果物) を推奨答つきで一度に示し、承認を一言もらう。依頼の時点で全部の項目に答え (事前の回答・指定) が付いていても同じで、要約を見せて承認の返事をもらうまで作らない。「確認は要らない」「再承認は不要」と書いてあっても、要約への返事の代わりにしない。質問への答え・訂正をもらっただけでも承認ではない。黙っていた・返事が無いのは承認ではない。返事をもらえない進め方 (人が見ていない実行など) なら、要約を出して「この内容でよければ、そうお返事ください」と書いて止まる。
 - **関門 2 — 取得した引用なしに「確認済み」と書かない。** モデルの記憶・二次情報 (解説記事・他事務所のサイト)・本人の記憶だけでは「確認済み」にしない。取得失敗・リンク切れ・内容の不一致・基準日に有効でない (旧制度・公布済み未施行・対象違い) は「未確認」。
 - **関門 3 — 未確認は [要確認] で見せる。** 未確認の主張は、スライド・読み原稿・図表のどこにあっても [要確認] を表示し、数字や日付を推測で埋めない。
 - **関門 4 — 別文脈の検品なしに「完了」と言わない。** 検品は、作り手の会話を持たない subagent か、新しく起動した別プロセスが行い、結果を file に残す。「別の文脈で行った」ことは、作り手の申告ではなく `scripts/review_record.py` が取る記録 (時刻・pid・終了コード・出力・渡した file の sha256) で示す。記録が揃わない時、どちらも使えなかった時、または納品する版が検品した版と違う時は、成果物と最後の報告に「未検品」と書く。
@@ -93,12 +93,13 @@ HTML スライドと、求められた成果物 (読み原稿・配布資料) �
 ### P6 書き出し (検品用の版)
 
 `python3 scripts/build.py <deck.html> --out <案件フォルダ>/out` で pptx・PDF・読み原稿と、書き出しの記録 `out/manifest.json` を作る (`--formats` で絞れる。詳細は `references/html-contract.md`)。
-書き出せない環境では HTML のまま検品に進み、利用者に「pptx はまだ作れていません」と理由つきで伝える。描画部品の差し替えは `references/adapters.md`。
+Codex では、`build.py` と `check.py pptx` を囲い (sandbox) の外で実行する (囲いの中では Chrome が起動しない)。利用者に一度だけ許可をもらう手順は `references/adapters.md` §2.1。
+書き出せない環境 (許可がもらえない時を含む) では HTML のまま検品に進み、利用者に「pptx はまだ作れていません」と理由つきで伝える。代わりの変換器をその場で書かない。`build.py` 以外で作った file は納品せず、「検品済み」と呼ばない。描画部品の差し替えは `references/adapters.md`。
 
 ### P5 検品 (作り手と別の文脈)
 
 1. 機械チェックを通す: `python3 scripts/check.py deck deck.html`、`python3 scripts/check.py ledger ledger.md deck.html [ほかの成果物 ...]` (台帳の隣の `sources/` があれば、引用を原典の本文と自動で照らす)、pptx があれば `python3 scripts/check.py pptx out/<名前>.pptx deck.html`、顧問先名や個人名の残りを見る `python3 scripts/check.py pii deck.html`。
-2. reviewer を作り手と別の文脈で起動する (Claude Code = 会話を引き継がない subagent、Codex = subagent か新しい `codex exec` プロセス)。渡すのは `BRIEF.md`・`ledger.md`・`deck.html` の 3 つの path だけ。作り手の説明・会話・前の検品結果は渡さない。
+2. reviewer を作り手と別の文脈で起動する (Claude Code = 会話を引き継がない subagent、Codex = 新しい `codex exec` プロセスを囲いの外で起動。Codex の subagent での点検は「未検品」。`references/review.md` §起動の仕方)。巡ごとに新しい reviewer を起動する。渡すのは `BRIEF.md`・`ledger.md`・`deck.html` の 3 つの path だけ。作り手の説明・会話・前の検品結果は渡さない。
 3. reviewer は原典との一致・言い過ぎ・要件の充足・受け手として読めるかを点検し、結果を `review/review-<n>.md` に書く。
 4. 起動は `scripts/review_record.py` を通す (subagent なら起動の直前に `start review --round <n>`、返事の直後に `finish review --round <n> --reviewer-id <id>`。別プロセスなら `run review --round <n> --stdin review/request-<n>.md -- <起動 command>`)。時刻・pid・終了コード・渡した path の sha256 は script が `review/independence-<n>.json` に書く。進行役は手で書かない。その後 `python3 scripts/check.py review-evidence review` を通す。通らない検品は無かったものとして扱う。
 5. 直しは既定で 2 巡まで。収まらなければ、残った指摘を本人に見せて判断を仰ぐ。

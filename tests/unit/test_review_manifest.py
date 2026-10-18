@@ -1,15 +1,26 @@
 """review_record.py + check.py review-evidence / manifest（AC-07・AC-08）と preview.py の起動・停止。"""
 import hashlib
 import json
+import re
 import sys
 import time
 import unittest
 
-from _helpers import TRAPS, TempDir, check, fails, run, warns
+from _helpers import SCRIPTS, TRAPS, TempDir, check, fails, run, warns
 
 
 def sha(p):
     return hashlib.sha256(p.read_bytes()).hexdigest()
+
+
+def filled_request(n=1, extra=""):
+    """references/review.md の雛形の <…> を埋めただけの依頼文（extra は雛形に無い行）。"""
+    doc = (SCRIPTS.parent / "references" / "review.md").read_text(encoding="utf-8")
+    body = re.search(r"## reviewer への依頼文.*?```markdown\n(.*?)\n```", doc, re.S).group(1)
+    for k, v in (("<案件フォルダ>", "/work/資料/case"), ("<skill>", "/skills/shiryo-kit"), ("<案件>", "テストの案件"),
+                 ("<n>", str(n)), ("<名前>", "deck"), (" <ほかの成果物>", ""), ("<BRIEF の spec_rev をそのまま>", "1")):
+        body = body.replace(k, v)
+    return body + ("\n" + extra + "\n" if extra else "\n")
 
 
 def reviewer_cmd(verdict="合格", deck_sha="", sleep=0.0, code=0, write=True):
@@ -26,10 +37,10 @@ class Case:
         for n in ("BRIEF.md", "ledger.md", "deck.html"):
             (d / n).write_bytes((TRAPS / n).read_bytes())
         (d / "review").mkdir()
-        (d / "review" / "request-1.md").write_text("# 検品の依頼\n- BRIEF.md\n- ledger.md\n- deck.html\n", encoding="utf-8")
+        (d / "review" / "request-1.md").write_text(filled_request(1), encoding="utf-8")
 
-    def rec(self, *args):
-        return run("review_record.py", *args, cwd=self.d)
+    def rec(self, *args, env=None):
+        return run("review_record.py", *args, cwd=self.d, env=env)
 
     def fresh(self, **kw):
         return self.rec("run", "review", "--round", "1", "--stdin", "review/request-1.md", "--",
@@ -171,6 +182,97 @@ class ReviewEvidence(unittest.TestCase):
         self.assertIn("雛形のまま", out)
 
 
+    def _subagent_round(self, c, n, reviewer_id, env=None):
+        d = c.d
+        (d / "review" / f"request-{n}.md").write_text(filled_request(n), encoding="utf-8")
+        code, _, err = c.rec("start", "review", "--round", str(n), env=env)
+        self.assertEqual(code, 0, err)
+        (d / "review" / f"review-{n}.md").write_text(f"## 結論: 合格\n- deck.html sha256: {sha(d / 'deck.html')}\nspec_rev: 1\n",
+                                                   encoding="utf-8")
+        code, _, err = c.rec("finish", "review", "--round", str(n), "--reviewer-id", reviewer_id)
+        self.assertEqual(code, 0, err)
+
+    def test_same_reviewer_for_next_round_fails(self):
+        # CX-7: 再検品で前の巡と同じ reviewer に続きを頼んだら FAIL（WARN ではない）
+        with TempDir() as d:
+            c = Case(d)
+            self._subagent_round(c, 1, "agent-1")
+            self._subagent_round(c, 2, "agent-1")
+            code, out, _ = c.evidence()
+        self.assertEqual(code, 1, out)
+        self.assertTrue(any("1 巡目と同じ" in f for f in fails(out)), out)
+
+    def test_new_reviewer_for_next_round_passes(self):
+        with TempDir() as d:
+            c = Case(d)
+            self._subagent_round(c, 1, "agent-1")
+            self._subagent_round(c, 2, "agent-2")
+            code, out, _ = c.evidence()
+        self.assertEqual(code, 0, out)
+        self.assertIn("2 巡目", out)
+
+    def test_request_off_template_is_refused(self):
+        # CX-8: 作り手の観点（「特に…を検品」「目安10分」）が依頼文に入っていたら start が止まる
+        for leak in ("特に日付・人数・経過措置を重点的に検品してください。", "今回の修正: 5年→3年", "目安10分で終えてください。"):
+            with TempDir() as d:
+                c = Case(d)
+                (d / "review" / "request-1.md").write_text(filled_request(1, leak), encoding="utf-8")
+                code, _, err = c.rec("start", "review", "--round", "1")
+                self.assertNotEqual(code, 0, leak)
+                self.assertIn("雛形", err)
+                self.assertIn(leak, err)
+                self.assertFalse((d / "review" / "independence-1.json").exists())
+                # run（別プロセス）でも起動の前に止まる
+                code, _, err = c.fresh()
+                self.assertNotEqual(code, 0, leak)
+                self.assertFalse((d / "review" / "run-1.jsonl").exists())
+
+    def test_codex_subagent_is_unreviewed(self):
+        # CX-2: Codex の subagent は会話を引き継がない起動を示せない → 記録が揃っていても未検品
+        for env, rid in (({"CODEX_SANDBOX": "seatbelt"}, "agent-1"), (None, "/root/review_seminar")):
+            with TempDir() as d:
+                c = Case(d)
+                self._subagent_round(c, 1, rid, env=env)
+                code, out, _ = c.evidence()
+            self.assertEqual(code, 1, out)
+            self.assertTrue(any("Codex の subagent" in f for f in fails(out)), out)
+
+    def _start_with(self, text):
+        with TempDir() as d:
+            c = Case(d)
+            (d / "review" / "request-1.md").write_text(text, encoding="utf-8")
+            return c.rec("start", "review", "--round", "1")
+
+    def test_request_leak_inside_placeholder_is_refused(self):
+        # 埋め字の後ろ・中に作り手の観点を足す / 埋め字を埋め忘れる
+        base = filled_request(1)
+        led = next(l for l in base.splitlines() if "check.py ledger" in l)
+        for text in (base.replace(led, led + " （特に日付・人数・経過措置を重点的に検品）"),
+                     base.replace("spec_rev: 1", "spec_rev: 1 今回の修正: 5年→3年"),
+                     base.replace("テストの案件", "A社。特に日付を重点的に検品してください"),
+                     base.replace("最後の 1 行: spec_rev: 1", "最後の 1 行: spec_rev: <BRIEF の spec_rev をそのまま>")):
+            code, _, err = self._start_with(text)
+            self.assertNotEqual(code, 0, text)
+            self.assertIn("雛形", err)
+
+    def test_request_valid_variants_pass(self):
+        # Windows の path、pptx が無い時に行を消す、ほかの成果物を足す
+        base = filled_request(1)
+        led = next(l for l in base.splitlines() if "check.py ledger" in l)
+        nopptx = "\n".join(l for l in base.splitlines() if "check.py pptx" not in l).replace("・out/ の file", "")
+        for text in (base.replace("/work/資料/case", r"C:\Users\k\資料\case").replace("/skills/shiryo-kit", r"C:\Users\k\.agents\skills\shiryo-kit"),
+                     nopptx,
+                     base.replace(led, led + " /work/資料/case/配布資料.html /work/資料/case/out/deck_読み原稿.md")):
+            code, _, err = self._start_with(text)
+            self.assertEqual(code, 0, err)
+
+    def test_request_template_filled_passes(self):
+        with TempDir() as d:
+            c = Case(d)
+            code, _, err = c.rec("start", "review", "--round", "1")
+        self.assertEqual(code, 0, err)
+
+
 class Manifest(unittest.TestCase):
     def build(self, d):
         return run("build.py", "deck.html", "--out", "out", "--formats", "notes", cwd=d)
@@ -193,6 +295,17 @@ class Manifest(unittest.TestCase):
             code, out, _ = check("manifest", "out", "review", cwd=d)
             self.assertEqual(code, 1)
             self.assertTrue(any("書き出した後に変わった" in f for f in fails(out)), out)
+
+    def test_unlisted_pptx_in_out_fails(self):
+        # CX-1: build.py の記録に無い pptx（即席の変換器の出力）が out/ にあれば渡さない
+        with TempDir() as d:
+            c = Case(d)
+            self.build(d)
+            c.fresh()
+            (d / "out" / "deck.pptx").write_bytes(b"PK\x03\x04 not from build.py")
+            code, out, _ = check("manifest", "out", "review", cwd=d)
+        self.assertEqual(code, 1, out)
+        self.assertTrue(any("build.py の書き出しの記録に無い" in f for f in fails(out)), out)
 
     def test_rebuilt_from_edited_deck_is_unreviewed(self):
         # 検品の後に数字を直して書き出し直した（AC-08: 直したら検品に戻る）

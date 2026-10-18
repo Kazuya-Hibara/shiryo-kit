@@ -99,5 +99,5 @@
 
 書籍 (要約のみ): Barbara Minto『The Pyramid Principle』/ Gene Zelazny『Say It With Charts』/ Ethan M. Rasiel『The McKinsey Way』/ Andrew V. Abela『Advanced Presentations by Design』/ Nancy Duarte『slide:ology』『Slidedocs』/ Richard E. Mayer『Multimedia Learning』/ Garner & Alley (2013)
 実務者・Web: slideworks.io / deckary.com / storytellingwithdata.com
-提供者 (A&A) のプレゼン判断の知識ベースと社内の検品基準を要約・一般化した。
+提供者のプレゼン判断の知識ベースと社内の検品基準を要約・一般化した。
 エージェント版の `skill/shiryo-kit/references/doctrine.md` を短くし、型の骨格の例を足したもの。

@@ -118,6 +118,10 @@ def check_round(review_dir, n, now=None):
             F(f"{n} 巡目: subagent の終了コードが {ex}")
         if ex is None and not rec.get("exit_note"):
             F(f"{n} 巡目: 終了コードが無く、その理由（exit_note）も無い")
+        rid = str(rec.get("reviewer_id") or "")
+        if rec.get("codex_env") or rid.startswith("/root/"):
+            F(f"{n} 巡目: Codex の subagent での点検（Codex の subagent は、作り手の会話を引き継がずに起動したことを記録で示せない。"
+              "新しい codex exec を囲いの外で起動する。references/review.md §Codex）")
         if rec.get("transcript"):
             t = Path(rec["transcript"])
             if t.exists() and rec.get("transcript_sha256") != sha256(t):
@@ -184,4 +188,11 @@ def check_review_dir(review_dir, now=None):
     if not ns:
         return None, [], [f"{review_dir} に検品の記録が無い（request-<n>.md・review-<n>.md・independence-<n>.json）"]
     results = [check_round(d, n, now) for n in ns]
-    return results[-1], results[:-1], []
+    last = results[-1]
+    # 巡ごとに新しい reviewer（同じ reviewer に続きを頼むと、前の巡の結論と作り手の直しの説明を持ったまま見る）
+    rid = str(last.record.get("reviewer_id") or "").strip()
+    reused = [r.n for r in results[:-1] if rid and str(r.record.get("reviewer_id") or "").strip() == rid]
+    if reused:
+        last.fails.append(f"{last.n} 巡目: reviewer {rid} は {', '.join(map(str, reused))} 巡目と同じ"
+                          "（巡ごとに新しい reviewer を起動する。前の reviewer に続きを頼んだ検品は検品ではない）")
+    return last, results[:-1], []

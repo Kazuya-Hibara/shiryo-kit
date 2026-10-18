@@ -28,10 +28,15 @@ def _has_chrome():
 HAS_CHROME = _has_chrome()
 
 
-def run(script, *args, cwd=None, timeout=600):
-    """scripts/<script> を別プロセスで実行して (終了コード, stdout, stderr)。"""
+CODEX_ENV_KEYS = ("CODEX_SANDBOX", "CODEX_SANDBOX_NETWORK_DISABLED", "CODEX_THREAD_ID")
+
+
+def run(script, *args, cwd=None, timeout=600, env=None):
+    """scripts/<script> を別プロセスで実行して (終了コード, stdout, stderr)。
+    Codex の中で試験を回しても結果が変わらないよう、Codex の印の環境変数は外す (env で足せる)。"""
+    base = {k: v for k, v in os.environ.items() if k not in CODEX_ENV_KEYS}
     r = subprocess.run([sys.executable, str(SCRIPTS / script), *map(str, args)], capture_output=True, text=True,
-                       encoding="utf-8", cwd=cwd, timeout=timeout, env={**os.environ, "PYTHONIOENCODING": "utf-8"})
+                       encoding="utf-8", cwd=cwd, timeout=timeout, env={**base, "PYTHONIOENCODING": "utf-8", **(env or {})})
     return r.returncode, r.stdout, r.stderr
 
 

@@ -7,7 +7,7 @@
 
 ## 独立と言える条件
 
-- reviewer は、作り手の会話を引き継がない subagent か、新しく起動した別プロセスである。
+- reviewer は、作り手の会話を引き継がない subagent か、新しく起動した別プロセスである (Codex の subagent は引き継がないことを示せないので当てはまらない。§起動の仕方 Codex)。
 - reviewer に渡すのは **3 つの path だけ**: `BRIEF.md`・`ledger.md`・`deck.html`。作り手の感想・「ここは確認済みです」などの説明・途中の下書き・会話の要約・前の回の検品結果は渡さない。
 - reviewer は、渡された file から辿れる物 (台帳にある `sources/` の抜き書きと URL、`out/` の書き出し) を自分で開き、skill フォルダの `scripts/check.py` と `references/doctrine.md` を道具として使ってよい。
 - reviewer は成果物を直さない。点検結果の file だけを書く。
@@ -28,7 +28,7 @@
    ```
    - `ledger` は台帳の隣の `sources/` (取得した原典の本文) があれば、確認済みの引用をそこと自動で照らす。PDF は `pdftotext` などで .txt にして置く。
    - `pii` は、顧問先名・個人の名前・連絡先が資料に残っていないかの機械の補助 (C の点検の入口。「ここは出してよい」と本人が決めた語は `--allow` で外す)。出た行は本人に確かめる。
-2. 依頼文を `review/request-<n>.md` に書く (下の雛形。path を埋めるだけ)。
+2. 依頼文を `review/request-<n>.md` に書く (下の雛形。`<…>` を埋めるだけ)。雛形に無い行 (「特に日付を見て」「今回直した所」「目安の時間」など) を足さない。`<…>` の中にも足さない。作り手の観点が reviewer に移るため。当てはまらない行は書き換えずに消す (pptx が無い時は `check.py pptx` の行と、4. の「・out/ の file」を消す)。雛形に無い行・埋めていない `<…>` があると `review_record.py` の `start`・`run` が止まる。
 3. **起動と記録は `scripts/review_record.py` を通す** (§起動の仕方)。時刻・終了コード・reviewer の識別子は script が取る。進行役が時計を見て書いたり、JSON を作ったりしない。
    - subagent: 起動の直前に `review_record.py start review --round <n>`、返事が返った直後に `review_record.py finish review --round <n> --reviewer-id <返ってきた id>`。
    - 別プロセス: `review_record.py run review --round <n> --stdin review/request-<n>.md -- <起動 command>`。
@@ -147,7 +147,7 @@ spec_rev: <n>
 
 別プロセスの出力 (`review/run-<n>.jsonl`・`run-<n>.stderr.log`) は `run` が残す。subagent の実行記録の file があれば `finish --transcript <file>` で渡すと、記録が強くなる。
 
-限界: 記録が示すのは「script が起動・時刻・出力・sha256 を取った」ところまで。subagent が作り手の会話を引き継いでいないことは記録からは分からない (だから上の「独立と言える条件」と起動の仕方を守る)。JSON を手で偽造することは防げない — 手で書かない・直さないのは進行役の決まり。
+限界: 記録が示すのは「script が起動・時刻・出力・sha256 を取った」ところまで。subagent の識別子は進行役が `finish --reviewer-id` で渡す値なので、同じ reviewer の使い回しを見つけられるのは、進行役が本当の id を渡した時だけ。subagent が作り手の会話を引き継いでいないことは記録からは分からない (だから上の「独立と言える条件」と起動の仕方を守る)。JSON を手で偽造することは防げない — 手で書かない・直さないのは進行役の決まり。
 
 ## 起動の仕方
 
@@ -164,15 +164,18 @@ python3 <skill>/scripts/review_record.py run review --round <n> --stdin review/r
 
 ### Codex
 
-- subagent が使えるなら、それでよい。ただし Codex の subagent が親の会話をどこまで引き継ぐかは公式 docs に書かれていない (2026-10-18 確認)。使う時は、依頼の本文に `review/request-<n>.md` と 3 つの path だけを書き、「この依頼文と file 以外の前提を使わない」と添える。
-- 迷ったら、または subagent が使えない時は、新しい `codex exec` プロセスを起動する。分離が実行記録で示せる。案件フォルダに移ってから:
+- 既定: 新しい `codex exec` プロセスを起動する。分離が実行記録で示せる。
+- **この command は Codex の囲い (sandbox) の外で実行する。** 囲いの中から `codex exec` を起動すると、必ず失敗する (`failed to initialize in-process app-server client: Operation not permitted`。Codex CLI 0.163 で実測)。書き出しと同じく、利用者に一度だけ許可をもらって囲いの外で実行する (`adapters.md` §2.1 の 1〜3)。許可の確認が出ない・断られた時は、検品は「未検品」。
+- subagent は検品に使わない。Codex の subagent には、作り手の会話を引き継がずに起動する指定が公式 docs に無く (2026-10-19 確認)、起動の記録 (`exec --json` の出力) にも起動の引数が残らない。つまり別の文脈だったことを記録で示せない。subagent に点検させた時は、その結果を作り手の点検と同じ扱いにし、状態は「未検品」とする (`review_record.py start`/`finish` で記録しても「検品済み」と言わない)。
+- 案件フォルダに移ってから:
 
 ```
 python3 <skill>/scripts/review_record.py run review --round <n> --stdin review/request-<n>.md -- \
   codex exec --json --skip-git-repo-check -C . -s workspace-write \
-  -c model_reasoning_effort="high" -o review/last-<n>.md -
+  -m gpt-6-astra -c model_reasoning_effort="high" -o review/last-<n>.md -
 ```
 
+  - モデルと考える深さ (`-m gpt-6-astra -c model_reasoning_effort="high"`) は `adapters.md` §1 と同じ。省くと Codex の既定のモデルで検品してしまう。
   - `codex exec` を `review_record.py run` に包む。`> review/run-<n>.jsonl` や `echo "exit=$?"` は要らない: 標準出力は `review/run-<n>.jsonl`、標準エラーは `review/run-<n>.stderr.log` に script が残し、時刻・pid・終了コードも script が記録する。reviewer の識別子は、出力の `thread.started` の `thread_id` を script が拾う。method は `fresh-process`。
   - reviewer は依頼文に従って `review/review-<n>.md` を自分で書く。`-o` は最後の返事を別の file (`last-<n>.md`) に残すだけで、`check.py review-evidence` は見ない (review file を上書きさせないための指定)。
   - workspace-write の既定ではネットに出られないことがある。原典を開き直させたい時は `-c sandbox_workspace_write.network_access=true` を足す (Codex CLI 0.163 の設定項目にあることを確認済み。版が違う時は効くか確かめる)。効かなければ `sources/` だけで点検させ、結果に「原典の開き直しはしていない」と書かせる。
@@ -187,7 +190,7 @@ python3 <skill>/scripts/review_record.py run review --round <n> --stdin review/r
 ## 直しの回し方
 
 1. 作り手は指摘を `issues.md` に写し、必須から直す。指摘に反対する時は理由を書いて残す (黙って無視しない)。
-2. 直したら台帳と機械チェックをやり直し (`revision.md`)、新しい reviewer (別の文脈) に次の巡を頼む。前の回の検品結果は渡さない (先入観を移さない)。前の指摘が直ったかは、作り手が新しい結果と `issues.md` を突き合わせて確かめる。
+2. 直したら台帳と機械チェックをやり直し (`revision.md`)、新しい reviewer (別の文脈) に次の巡を頼む。前の巡の reviewer に続きを頼まない (前の結論と直しの説明を持ったまま見ることになる。reviewer の識別子が前の巡と同じだと `check.py review-evidence` が FAIL にする)。前の回の検品結果は渡さない (先入観を移さない)。前の指摘が直ったかは、作り手が新しい結果と `issues.md` を突き合わせて確かめる。
 3. 直しは既定で 2 巡まで。2 巡目でも必須の指摘が残ったら、それ以上回さずに本人に見せる: 「点検で次の指摘が残っています。どうするか決めてください」。本人が「このままでよい」と言ったら、その言葉を BRIEF の決定ログに残し、状態は「検品済み・指摘が残っています」とする。
 
 ## 納品の前
@@ -208,5 +211,6 @@ python3 <skill>/scripts/review_record.py run review --round <n> --stdin review/r
 - 作り手の申告は証拠ではない: BMAD-METHOD `claims-check` (MIT)
 - 受け手になって読む点検: anthropics/skills `doc-coauthoring` の Reader Testing の考え方 (文言は使っていない)
 - 機械抽出の結果を判定の入力にし、実行記録の無い判定を無効にする、点検役に渡す物を絞る、直しは 2 巡までで人に返す: 提供者の社内の検品手順と注意力設計を一般化
-- Codex の subagent の既定: https://learn.chatgpt.com/docs/agent-configuration/subagents (2026-10-18 取得)
+- Codex の subagent の既定 (親の会話を引き継ぐかの記載が無い・起動の指定は名前・説明・指示・モデル・考える深さだけ): https://learn.chatgpt.com/docs/agent-configuration/subagents (2026-10-18 取得、2026-10-19 再確認)
+- Codex の囲いの外での実行: https://learn.chatgpt.com/docs/agent-approvals-security (2026-10-19 取得)。囲いの中で `codex exec` が起動しないこと: 提供者の受け入れ試験 (2026-10-18)
 - `codex exec` の option: Codex CLI の `codex exec --help` (0.163、2026-10-18 時点)

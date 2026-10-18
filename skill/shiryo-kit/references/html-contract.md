@@ -111,6 +111,7 @@ python3 scripts/build.py deck.html --out out [--formats pptx,pdf,notes] [--autho
 - `--formats notes` だけなら Node.js・Chrome は要らない。
 - `--notes notes.json`: `["1枚目", "", "3枚目"]` か `{"1": "…", "3": "…"}`。HTML のノートより優先。
 - 書き出したら必ず `python3 scripts/check.py pptx out/<名前>.pptx deck.html`。
+- Codex では、`build.py` と Chrome を使う `check.py pptx` を囲い (sandbox) の外で実行する。囲いの中では Chrome が起動しない。手順と、できない時の止まり方 (「pptx はまだ作れていません」) は `adapters.md` §2.1。`build.py` の代わりに即席の変換器を書かない。`build.py` 以外で作った file は `check.py manifest` を通らず、納品しない。
 
 ## 4. 機械チェック (scripts/check.py)
 
@@ -147,12 +148,12 @@ python3 <skill>/scripts/review_record.py finish review --round <n> --reviewer-id
 
 # 別プロセス: 起動そのものを review_record.py にさせる (時刻・pid・終了コード・出力を script が取る)
 python3 <skill>/scripts/review_record.py run review --round <n> --stdin review/request-<n>.md -- \
-  codex exec --json --skip-git-repo-check -C . -s workspace-write -c model_reasoning_effort="high" -o review/last-<n>.md -
+  codex exec --json --skip-git-repo-check -C . -s workspace-write -m gpt-6-astra -c model_reasoning_effort="high" -o review/last-<n>.md -
 python3 <skill>/scripts/review_record.py run review --round <n> --stdin review/request-<n>.md -- \
   claude -p --output-format json --allowedTools "Read,Write,Bash(python3:*),WebFetch"
 ```
 
-- `start` は `request-<n>.md` が無いと止まる。`review-<n>.md` が起動前からあっても止まる (前の結果を使い回さない)。同じ巡を起動し直す時は `--force`。
+- `start` は `request-<n>.md` が無いと止まる。依頼文に `review.md` の雛形に無い行がある時も止まる (`<…>` を埋めた行だけを認める)。`run` も起動の前に同じことを確かめる。`review-<n>.md` が起動前からあっても止まる (前の結果を使い回さない)。同じ巡を起動し直す時は `--force`。
 - 渡す物は案件フォルダの `BRIEF.md`・`ledger.md`・`deck.html` の 3 つに決まっている (別の名前なら `--brief` `--ledger` `--deck`)。`start` の時点の sha256 を記録する。
 - subagent は終了コードを返さない。`--exit` を付けなければ `exit_status: null` と、その理由 (`exit_note`) を記録する。これは「返事が返り、結果の file がある = 正常終了」として扱う決まり。
 
@@ -174,8 +175,8 @@ python3 <skill>/scripts/review_record.py run review --round <n> --stdin review/r
 
 `check.py review-evidence review` は最後の巡について次を全部確かめる。1 つでも欠けたら `FAIL 未検品: <理由>`。
 - 記録がある・schema と round が合う・method が 2 つのどちらか・status が finished。
-- 起動 < 終了・未来の時刻でない。reviewer の識別子がある。
-- 別プロセス: 終了コード 0・pid がある・実行記録の file があり空でなく sha256 が同じ。subagent: 終了コード 0 か null (理由つき)。
+- 起動 < 終了・未来の時刻でない。reviewer の識別子がある。reviewer の識別子が前の巡のどれとも違う (同じ reviewer に再検品を頼んでいない)。
+- 別プロセス: 終了コード 0・pid がある・実行記録の file があり空でなく sha256 が同じ。subagent: 終了コード 0 か null (理由つき)。Codex の subagent でない (`start` の時に Codex の囲いの印の環境変数があった、または識別子が `/root/` で始まる → FAIL。Codex の subagent は会話を引き継がない起動を示せないため)。
 - inputs がちょうど 3 つ・今の file の sha256 が記録と同じ (検品の後に直したら、その版は未検品)。
 - 依頼文が起動の後に書き換えられていない。
 - 結果の file がある・sha256 が終了時点と同じ・更新時刻が起動〜終了 (+120 秒) の間・「結論: 合格」か「結論: 直しが必要」の行がある (雛形のままは FAIL)。
@@ -193,8 +194,9 @@ python3 <skill>/scripts/review_record.py run review --round <n> --stdin review/r
 - 書き出した後に deck.html が変わった。記録にある file が無い・書き出した後に変わった (手で直した pptx)・前の版の deck から書き出した。
 - review-evidence が通らない (→ `未検品: …`)。
 - 書き出した時の deck・台帳・BRIEF の sha256 が、最後の巡で検品した物と違う (→ `未検品: …`)。
+- `out/` に、記録に無い pptx・pdf がある (`build.py` 以外で作った物。即席の変換器の出力など)。
 
-通った時は `OK manifest: 状態=検品済み` か、結論が「直しが必要」なら `状態=検品済み・指摘が残っています` (+ WARN)。`out/` にあって記録に無い file は WARN (照合できないので渡さない)。
+通った時は `OK manifest: 状態=検品済み` か、結論が「直しが必要」なら `状態=検品済み・指摘が残っています` (+ WARN)。`out/` にあって記録に無い md・docx・html は WARN (照合できないので渡さない)。
 
 ## 6. プレビュー (scripts/preview.py)
 

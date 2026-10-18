@@ -25,7 +25,7 @@
 
 使うのは `instructions.md` (指示文) という 1 つのファイルだけです。
 
-1. GitHub の shiryo-kit のページ (README が表示されるページ) の上の方にある、緑色の **「Code」** ボタンを押し、**「Download ZIP」** を選びます。
+1. GitHub の shiryo-kit の **いちばん上のページ** を開きます (今このページを GitHub で見ているなら、ページの上の方にある「shiryo-kit」の文字を押すと戻れます)。その上の方にある、緑色の **「Code」** ボタンを押し、**「Download ZIP」** を選びます。
 2. ダウンロードした ZIP を開きます (展開します)。Mac はダブルクリック、Windows は右クリック →「すべて展開」。
 3. できたフォルダの中の **`chat`** フォルダを開きます。
 4. **`instructions.md`** を、文字だけを開くアプリで開きます。
@@ -35,7 +35,7 @@
 
 ZIP を使わない方法: GitHub で [instructions.md](instructions.md) を開き、本文の右上にある「Copy raw file」(四角が 2 つ重なった形のボタン) を押すと、全文がコピーされます。
 
-`knowledge` フォルダの 3 つのファイルは任意です (入れると聞き方や出典の確かめ方が安定しやすくなります)。
+`knowledge` フォルダの 3 つのファイルは任意です (入れると聞き方や出典の確かめ方が安定しやすくなります。法令・制度の資料なら入れるのがおすすめです)。入れる場所は §4 の、お使いの AI の手順 3 にあります。
 
 ### 要るプラン
 
@@ -102,7 +102,7 @@ AI が次の順番で進めます。
 
 | ファイル | 中身 | 使い方 |
 |---|---|---|
-| `instructions.md` | 指示文 (約 5,800 字) | 全文をコピーして、指示の欄に貼る |
+| `instructions.md` | 指示文 (約 6,300 字) | 全文をコピーして、§4-1〜§4-4 の各アプリの「指示」の所に貼る |
 | `knowledge/hearing-guide.md` | 聴き取りの手引き | 入れなくても動く。入れると聞き方が安定しやすい |
 | `knowledge/evidence-rules.md` | 出典の確かめ方 (どの役所のどのページを見るか、施行日の確かめ方) | 同上。法令・制度の資料なら入れるのがおすすめ |
 | `knowledge/doctrine.md` | 資料の判断の軸 (タイトルの付け方、話す資料と配る資料の違い、4 つの型) | 同上 |
@@ -112,16 +112,18 @@ AI が次の順番で進めます。
 
 ### 4-1. ChatGPT (プロジェクト)
 
-1. ChatGPT の左の欄で「プロジェクト」→ 新しいプロジェクトを作る (名前の例:「資料づくり」)。
-2. プロジェクトの右上の「…」→「プロジェクト設定」を開き、指示の欄に `instructions.md` の全文を貼って保存。
-3. (任意) プロジェクトのファイルに `knowledge/` の 3 つのファイルを追加。
+1. ChatGPT の左の欄で「新規プロジェクト」を押し、名前を付けて作る (名前の例:「資料づくり」)。
+2. プロジェクトの右上の「…」(点が 3 つのボタン) →「プロジェクト設定」を開き、プロジェクトへの指示として `instructions.md` の全文を貼って保存。ChatGPT 全体の設定にある「カスタム指示」とは別の所です (§3)。
+3. (任意) プロジェクトにファイルとして `knowledge/` の 3 つのファイルをアップロードする。英語の画面では、プロジェクトの「Sources」のタブに入れます。日本語の画面での名前は、まだ確かめていません。
 4. そのプロジェクトの中で新しいチャットを始め、「セミナー資料をお願いします」のように頼む。
 
 ### 4-2. Claude (プロジェクト)
 
-1. claude.ai の「プロジェクト」→ 新しいプロジェクトを作る。
-2. 「プロジェクトの指示を設定」(Set project instructions) に `instructions.md` の全文を貼って保存。
-3. (任意) プロジェクトのファイルに `knowledge/` の 3 つのファイルを追加。
+Claude の公式の説明は英語の画面の名前で書かれているので、ここも英語の名前で書きます。日本語の画面では名前が違うことがあります。
+
+1. claude.ai の左の欄の「Projects」を開き、右上の「+ New Project」を押して、名前を付けて作る。
+2. 「Set project instructions」(プロジェクトへの指示を書くボタン) を押し、`instructions.md` の全文を貼って「Save instructions」で保存。
+3. (任意) プロジェクトの画面の右側にある、資料を入れる欄 (project knowledge) の「+」を押して、`knowledge/` の 3 つのファイルをアップロードする。
 4. そのプロジェクトの中で新しいチャットを始めて頼む。
 
 ### 4-3. Claude (スキルとして入れる) — 慣れた方向け。読まなくてかまいません
@@ -138,10 +140,10 @@ AI が次の順番で進めます。
 
 ### 4-4. Gemini (Gem)
 
-1. パソコンのブラウザで Gemini を開き、左の欄の「Gem」→ 新しい Gem を作る (名前の例:「資料づくり」)。
-2. 「指示」の欄に `instructions.md` の全文を貼る。
-3. (任意) 「知識」の「ファイルを追加」で `knowledge/` の 3 つのファイルを追加。
-4. 保存して、その Gem でチャットを始める。
+1. パソコンのブラウザで gemini.google.com を開き、左の欄の「Gem」→「Gem を作成」を押す。名前を付ける (名前の例:「資料づくり」)。
+2. 「カスタム指示」の欄に `instructions.md` の全文を貼る。
+3. (任意) 「知識」の下にある「ファイルを追加」のアイコンを押し、`knowledge/` の 3 つのファイルをアップロードする (「知識」が見えない時は下にスクロール)。
+4. 「保存」を押して、その Gem でチャットを始める。
 
 個人の Google アカウントでは 2026-11-17 から Gem が「スキル」に自動で移ります。移った後もそのまま使えるかは、まだ確かめていません。新しく始める場合は、Claude 用と同じ `shiryo-kit-chat` フォルダを Gemini の「スキル」にアップロードする方法もあります (未検証)。
 
@@ -211,6 +213,6 @@ ChatGPT や Gemini で作った時は、スライド文面を上の表の道具�
   ```
 - スキルの説明文 (description) は 200 字まで、frontmatter は `name` と `description` だけ (claude.ai のアップロードがそれ以外を受け付けないため)。名前に "claude" "anthropic" を入れない。
 - 指示文は 8,000 字以内に保つ。ChatGPT・Claude のプロジェクトと Gemini の Gem の指示欄の上限は公式ページに書かれていない。8,000 字は第三者の記載とカスタム GPT のエラー文から取った安全側の目安。
-- 根拠にした公式ページ (2026-10-18 に確認): ChatGPT のプロジェクト https://help.openai.com/en/articles/10169521-projects-in-chatgpt (本文は開けず要約で確認) / Claude のプロジェクト https://support.claude.com/en/articles/9517075-what-are-projects / Claude のスキル https://support.claude.com/en/articles/12512180-use-skills-in-claude と https://support.claude.com/en/articles/12512198-how-to-create-custom-skills / Claude Slides https://support.claude.com/en/articles/17153992-what-are-artifacts-and-how-do-i-use-them / Claude for PowerPoint https://claude.com/docs/office-agents/powerpoint / Gemini の Gem https://support.google.com/gemini/answer/15146780 / Gemini のスキル https://support.google.com/gemini/answer/17094296 / Gemini の Canvas の書き出し https://support.google.com/gemini/answer/16047321 / ChatGPT Slides https://help.openai.com/en/articles/20001605-creating-and-collaborating-on-slides-in-chatgpt と ChatGPT for PowerPoint https://help.openai.com/en/articles/20001242-chatgpt-for-powerpoint (どちらも要約で確認)。
+- 根拠にした公式ページ (2026-10-18 に確認、§4 の画面の名前は 2026-10-19 に確認): ChatGPT のプロジェクト https://help.openai.com/en/articles/10169521-projects-in-chatgpt と日本語版 https://help.openai.com/ja-jp/articles/10169521 (どちらも本文は開けず、検索結果に出た公式ページの文で確認。「新規プロジェクト」「プロジェクト設定」はこの日本語版の言葉) / ChatGPT のプロジェクトのファイルが「Sources」のタブに移ったこと https://help.openai.com/en/articles/10128477-chatgpt-enterprise-and-edu-release-notes (要約で確認) / Claude のプロジェクト https://support.claude.com/en/articles/9517075-what-are-projects と作り方 https://support.claude.com/en/articles/9519177-how-can-i-create-and-manage-projects (日本語版は見つからず、英語の画面の名前だけ確認) / Gemini の Gem の作り方 (日本語) https://support.google.com/gemini/answer/15146780?hl=ja / Claude のスキル https://support.claude.com/en/articles/12512180-use-skills-in-claude と https://support.claude.com/en/articles/12512198-how-to-create-custom-skills / Claude Slides https://support.claude.com/en/articles/17153992-what-are-artifacts-and-how-do-i-use-them / Claude for PowerPoint https://claude.com/docs/office-agents/powerpoint / Gemini のスキル https://support.google.com/gemini/answer/17094296 / Gemini の Canvas の書き出し https://support.google.com/gemini/answer/16047321 / ChatGPT Slides https://help.openai.com/en/articles/20001605-creating-and-collaborating-on-slides-in-chatgpt と ChatGPT for PowerPoint https://help.openai.com/en/articles/20001242-chatgpt-for-powerpoint (どちらも要約で確認)。
 - ※ の付いた記述 (公式ページの本文が開けず、検索結果の要約で確かめたもの): ChatGPT のプロジェクトの対象プランとファイル数、カスタム GPT の終了予定、ChatGPT Slides・ChatGPT for PowerPoint の対象プランと書き出し形式、Gemini の Canvas の対象プラン。使う前にブラウザで開いて確かめ直してください。
 - 中身は、エージェント版 `skill/shiryo-kit/` の SKILL.md と references (hearing・evidence・doctrine・memory・voice・review) を、チャットアプリ向けに短くしたもの。出典は各参考資料の末尾にあります。

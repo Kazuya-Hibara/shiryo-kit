@@ -100,5 +100,5 @@
 - 急ぐ人向けにまとめて仮定を示す: BMAD-METHOD `bmad-product-brief` (MIT)
 - 誘導しない・二重質問を避ける: Steve Portigal『Interviewing Users』、Erika Hall『Just Enough Research』の一般的な規律の要約
 - 答えの確かめ方: Rob Fitzpatrick『The Mom Test』、laddering の要約
-- 項目に状態を付けて空白を埋めない運用: 提供者 (A&A) の社内ヒアリング手順を一般化
+- 項目に状態を付けて空白を埋めない運用: 提供者の社内ヒアリング手順を一般化
 - エージェント版の `skill/shiryo-kit/references/hearing.md` を短くしたもの

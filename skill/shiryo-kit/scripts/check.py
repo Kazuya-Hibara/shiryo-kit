@@ -424,7 +424,10 @@ def cmd_manifest(out_dir, review_dir):
     if not m.get("outputs"):
         fails.append("書き出した file の記録が無い")
     for f in sorted(out.iterdir()) if out.is_dir() else []:
-        if f.is_file() and f.name not in listed and f.name != "manifest.json" and f.suffix.lower() in (".pptx", ".pdf", ".md", ".docx", ".html"):
+        if f.is_file() and f.name not in listed and f.name != "manifest.json" and f.suffix.lower() in (".pptx", ".pdf"):
+            fails.append(f"{f.name} は build.py の書き出しの記録に無い pptx/pdf（即席の変換器などで作った物は渡さない。"
+                         "消すか out/ の外に移す。build.py で書き出し直す）")
+        elif f.is_file() and f.name not in listed and f.name != "manifest.json" and f.suffix.lower() in (".md", ".docx", ".html"):
             warns.append(f"{f.name} は書き出しの記録に無い（照合できないので渡さない）")
     last, efails, ewarns = _evidence(review_dir)
     warns += ewarns
