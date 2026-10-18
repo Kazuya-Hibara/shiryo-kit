@@ -1,6 +1,6 @@
 ---
 fictional: true
-persona_source: ~/Obsidian/Work-OS/personas/persona_solo-shigyo-material-maker.md
+persona_source: 非公開の面談メモ (1 名の面談に基づく仮説。層としての一般化は未検証)
 serves: AC-03 (R-05 / P8: 2 回目で質問が減る・推奨答・訂正と削除)
 script_id: persona-b
 precondition: seeded-memory/before-b/ を作業フォルダに置く (または persona-a の実走後のメモリーを使い、使った方を記録)

@@ -186,6 +186,7 @@ def main():
 <html lang="ja"><head><meta charset="utf-8">
 <title>{a.title}</title>
 <!-- scripts/new_deck.py で生成。基本パーツ集（.s）と追加パーツ集（.slide）のCSSをスコープして結合してある。
+     Copyright (c) 2026 Carnot AI Inc. (MIT) — CSS and markup derived from carnot-tech/consulting-pptx-skill templates/freeform_parts_16x9.html and templates/freeform_parts_more_16x9.html (see NOTICE).
      契約: references/html-contract.md ／ 納品前: python3 scripts/check.py deck {pathlib.Path(a.out).name} → FAIL 0 -->
 <style>
 /* 読み原稿（スピーカーノート）は画面にも印刷にも出さない */

@@ -12,11 +12,19 @@ Derived files (modified unless noted):
   skill/shiryo-kit/scripts/html_dump.mjs     keeps the author's spaces between Japanese characters, never draws aside.notes, text export, effective CSS zoom applied to font sizes, spacing and borders
   skill/shiryo-kit/scripts/lib_cdp.mjs       Chrome/Edge/Chromium discovery (macOS/Windows/Linux), SHIRYO_CHROME_WAIT_MS, error messages
   skill/shiryo-kit/scripts/check_deck.py     no hard-coded tool name, parts path, notes excluded, rule-document references removed (not changed since; the relaxed title rules live in check.py)
-  skill/shiryo-kit/scripts/new_deck.py       parts path, empty <aside class="notes"> per slide, split_css finds the first <style> after stripping HTML comments
+  skill/shiryo-kit/scripts/new_deck.py       parts path, empty <aside class="notes"> per slide, split_css finds the first <style> after stripping HTML comments, upstream copyright line in the generated deck's header comment
   skill/shiryo-kit/scripts/pptx_open.py      unchanged
   skill/shiryo-kit/scripts/data/banned_phrases.txt   partly from the upstream AI-smell word list
   skill/shiryo-kit/assets/parts/freeform_parts_16x9.html        default back-cover credit line removed
   skill/shiryo-kit/assets/parts/freeform_parts_more_16x9.html   unchanged except header comment
+  skill/shiryo-kit/assets/kata/*/sample.html (seminar, advisory, proposal, report)
+                                             sample decks assembled by new_deck.py from the two parts files above:
+                                             their CSS and slide markup come from the upstream templates; text is fictional
+  tests/unit/fixtures/sample_deck.html       test deck assembled the same way
+
+Decks that new_deck.py writes for you also contain CSS and markup from the two parts files.
+Each generated deck carries a header comment with the copyright line above; keep it, together with
+this NOTICE, when you redistribute the HTML. (The slides themselves do not show any credit line.)
 
 ----------------------------------------------------------------------
 MIT License

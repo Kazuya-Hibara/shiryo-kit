@@ -1,6 +1,6 @@
 ---
 fictional: true
-persona_source: ~/Obsidian/Work-OS/personas/persona_solo-shigyo-material-maker.md (1 名の面談に基づく仮説。層としての一般化は未検証)
+persona_source: 非公開の面談メモ (1 名の面談に基づく仮説。層としての一般化は未検証)
 serves: AC-02 (R-03/04)、AC-05 (口調・個人情報)、AC-04 への入口 (同じ依頼文)
 script_id: persona-a
 spec_rev_of_requirements: 1.0

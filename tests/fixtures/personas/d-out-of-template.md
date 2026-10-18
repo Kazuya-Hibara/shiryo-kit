@@ -1,6 +1,6 @@
 ---
 fictional: true
-persona_source: ~/Obsidian/Work-OS/personas/persona_solo-shigyo-material-maker.md
+persona_source: 非公開の面談メモ (1 名の面談に基づく仮説。層としての一般化は未検証)
 serves: AC-10 (R-10: 型 4 種のプレビューから選べる / 型に無い依頼も最後まで通る)、副次: AC-02 (ヒアリング)、AC-04 (台帳)、AC-07 (検品)
 script_id: persona-d
 precondition: 空のメモリー (初回) でも、seeded-memory/before-c/ でもよい。どちらかを記録する

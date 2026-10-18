@@ -5,8 +5,8 @@
 skill フォルダの SKILL.md と references/ は生成物なので、直接直さずにこの script を流す。
 
   python3 chat/tools/build_claude_skill.py            # skill フォルダを作り直す
-  python3 chat/tools/build_claude_skill.py --check    # 正本とずれていれば exit 1
-  python3 chat/tools/build_claude_skill.py --zip DIR  # 作り直して DIR/shiryo-kit-chat.zip も作る (zip の最上位 = フォルダ)
+  python3 chat/tools/build_claude_skill.py --check    # ずれが無ければ OK を出す。ずれていれば DRIFT を出して exit 1
+  python3 chat/tools/build_claude_skill.py --zip DIR  # 正本から DIR/shiryo-kit-chat.zip だけを作る (zip の最上位 = フォルダ。repo の中は書き換えない)
 """
 import argparse, sys, zipfile
 from pathlib import Path
@@ -71,7 +71,18 @@ def main():
         bad = sorted(set(files) ^ set(actual)) + sorted(k for k in files if k in actual and files[k] != actual[k])
         for k in bad:
             print(f'DRIFT {k}')
-        sys.exit(1 if bad else 0)
+        if bad:
+            sys.exit(1)
+        print(f'OK {SKILL_DIR.relative_to(CHAT.parent)} は正本と一致 ({len(files)} files)')
+        return
+    if a.zip:
+        out = Path(a.zip) / f'{NAME}.zip'
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
+            for rel, text in files.items():
+                z.writestr(f'{NAME}/{rel}', text)
+        print(f'zip {out} ({len(files)} files、正本から作成。repo の写しは変えていない)')
+        return
     for rel, text in files.items():
         dst = SKILL_DIR / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
@@ -79,13 +90,7 @@ def main():
     for p in SKILL_DIR.rglob('*'):
         if p.is_file() and str(p.relative_to(SKILL_DIR)) not in files:
             p.unlink()
-    print(f'built {SKILL_DIR} ({len(files)} files, SKILL.md {files["SKILL.md"].count(chr(10))} lines)')
-    if a.zip:
-        out = Path(a.zip) / f'{NAME}.zip'
-        with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
-            for rel in files:
-                z.write(SKILL_DIR / rel, f'{NAME}/{rel}')
-        print(f'zip {out}')
+    print(f'built {SKILL_DIR.relative_to(CHAT.parent)} ({len(files)} files, SKILL.md {files["SKILL.md"].count(chr(10))} lines)')
 
 if __name__ == '__main__':
     main()
