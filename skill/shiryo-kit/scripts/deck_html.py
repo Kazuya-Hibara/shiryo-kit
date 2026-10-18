@@ -56,6 +56,7 @@ class Slide:
     title: str = ""
     blocks: list = field(default_factory=list)
     notes: str = ""
+    notes_ledger: list = field(default_factory=list)   # notes の各行の、台帳の照合に使う文字（data-ledger="skip" の部分を除く）
     has_table: int = 0
     has_media: int = 0
 
@@ -85,12 +86,19 @@ class Deck:
 
 
 class _El:
-    __slots__ = ("tag", "attrs", "classes", "buf", "skip_ledger", "hidden", "order", "slide", "notes", "is_title")
+    __slots__ = ("tag", "attrs", "classes", "buf", "skip_ledger", "hidden", "order", "slide", "notes", "is_title",
+                 "parent", "first", "last", "n_children", "gone", "vis")
 
     def __init__(self, tag, attrs, order):
         self.tag = tag
         self.attrs = attrs
         self.classes = (attrs.get("class") or "").split()
+        self.parent = None
+        self.first = None
+        self.last = None  # 流しながら読むので「最後の子」は分からない（css_lite は当てない側に倒す）
+        self.n_children = 0
+        self.gone = False      # display:none（子に継がれ、子では戻せない）
+        self.vis = "visible"   # visibility（子に継がれ、子で visible に戻せる）
         self.buf = []
         self.skip_ledger = False
         self.hidden = False
@@ -101,8 +109,9 @@ class _El:
 
 
 class _Parser(HTMLParser):
-    def __init__(self):
+    def __init__(self, hide_rules=()):
         super().__init__(convert_charrefs=True)
+        self.hide_rules = hide_rules  # display:none / visibility:hidden の規則（css_lite）
         self.stack = []
         self.slides = []
         self.cur = None  # 今のスライド
@@ -140,15 +149,38 @@ class _Parser(HTMLParser):
             el.skip_ledger = parent.skip_ledger
             el.hidden = parent.hidden
             el.notes = parent.notes
-        style = a.get("style", "").replace(" ", "").lower()
-        if "hidden" in a or "display:none" in style:
-            el.hidden = True
+        if parent is not None:
+            el.parent = parent
+            el.first = parent.n_children == 0
+            parent.n_children += 1
+        if parent is not None:
+            el.gone, el.vis = parent.gone, parent.vis
+        if "hidden" in a:
+            el.gone = True
+        if not (self.cur is None and self._is_slide(el)):  # スライドの要素そのものは隠さない（html_dump.mjs と同じく全部描く）
+            import css_lite
+            disp = vis = None
+            if self.hide_rules:
+                view = _CssView(el)
+                for r in self.hide_rules:  # 詳細度・出現順に並んでいる。後の規則が勝つ
+                    if css_lite.matches(r.chain, view):
+                        disp = r.decls.get("display", disp)
+                        vis = r.decls.get("visibility", vis)
+            inline = css_lite.parse_decls(a.get("style", ""))
+            disp = inline.get("display", disp)
+            vis = inline.get("visibility", vis)
+            if disp is not None and disp.strip().lower() == "none":
+                el.gone = True
+            if vis is not None:
+                el.vis = vis.strip().lower()
+        el.hidden = el.gone or el.vis in ("hidden", "collapse")
         if a.get("data-ledger") == "skip" or (LEDGER_SKIP_CLASSES & set(el.classes)):
             el.skip_ledger = True
         if self.cur is None and self._is_slide(el):
             s = Slide(index=len(self.slides) + 1, classes=el.classes)
             if a.get("data-notes"):
                 s.notes = a["data-notes"].strip()
+                s.notes_ledger = s.notes.split("\n")
             self.slides.append(s)
             self.cur = s
             el.slide = s
@@ -168,7 +200,7 @@ class _Parser(HTMLParser):
         if tag in VOID:
             return
         if el.notes and tag in BLOCK and self.notes_buf is not None:
-            self.notes_buf.append("\n")
+            self.notes_buf.append(("\n", False))
         self.stack.append(el)
 
     def stack_has(self, tag):
@@ -198,12 +230,19 @@ class _Parser(HTMLParser):
         if el.notes and self.notes_buf is not None:
             parent_notes = self.stack and self.stack[-1].notes
             if el.tag in BLOCK:
-                self.notes_buf.append("\n")
+                self.notes_buf.append(("\n", False))
             if not parent_notes:  # aside.notes が閉じた
-                txt = "\n".join(finish_text(x) for x in "".join(self.notes_buf).split("\n"))
-                txt = re.sub(r"\n{2,}", "\n", txt).strip("\n")
-                if txt and self.cur is not None:
+                full = "".join(c for c, _ in self.notes_buf).split("\n")
+                # data-ledger="skip" の部分は空白に置き換える（行の数は変えない = 読み原稿の行と対応させる）
+                led = "".join(re.sub(r"[^\n]", " ", c) if sk else c for c, sk in self.notes_buf).split("\n")
+                pairs = [(finish_text(f), finish_text(g)) for f, g in zip(full, led)]
+                pairs = [(f, g) for f, g in pairs if f]
+                if pairs and self.cur is not None:
+                    txt = "\n".join(f for f, _ in pairs)
+                    if self.cur.notes and not self.cur.notes_ledger:
+                        self.cur.notes_ledger = self.cur.notes.split("\n")
                     self.cur.notes = (self.cur.notes + "\n" + txt).strip("\n") if self.cur.notes else txt
+                    self.cur.notes_ledger += [g for _, g in pairs]
                 self.notes_buf = None
             return
         if self.cur is None:
@@ -235,7 +274,7 @@ class _Parser(HTMLParser):
             return
         top = self.stack[-1]
         if top.notes and self.notes_buf is not None:
-            self.notes_buf.append(_collapse(data) if data != "\n" else "\n")
+            self.notes_buf.append((_collapse(data) if data != "\n" else "\n", top.skip_ledger))
             return
         if self.cur is None:
             return
@@ -247,13 +286,37 @@ class _Parser(HTMLParser):
         self._data(data)
 
 
+class _CssView:
+    """css_lite.matches に渡す形（classes を集合に）。"""
+    __slots__ = ("tag", "attrs", "classes", "parent", "first", "last")
+
+    def __init__(self, el):
+        self.tag, self.attrs, self.classes = el.tag, el.attrs, set(el.classes)
+        self.parent = _CssView(el.parent) if el.parent is not None else None
+        self.first, self.last = el.first, el.last
+
+
+def _hide_rules(html):
+    """<style> のうち display・visibility を決める規則（隠す規則と、後から見せ直す規則の両方）。
+    aside.notes の規則は除く（ノートは別に読む）。値の var() は解いておく。"""
+    import css_lite
+    rules, variables = css_lite.parse_css(css_lite.style_text(html))
+    out = []
+    for r in rules:
+        if ("display" in r.decls or "visibility" in r.decls) and not any(
+                c["tag"] == "aside" or "notes" in c["cls"] for _, c in r.chain):
+            r.decls = {k: css_lite.resolve_var(v, variables) for k, v in r.decls.items() if k in ("display", "visibility")}
+            out.append(r)
+    return out
+
+
 def parse_deck(source):
     """source: パス or HTML 文字列。Deck を返す。"""
     if isinstance(source, Path) or (isinstance(source, str) and "<" not in source and Path(source).exists()):
         html = Path(source).read_text(encoding="utf-8", errors="replace")
     else:
         html = source
-    p = _Parser()
+    p = _Parser(_hide_rules(html))
     p.feed(html)
     p.close()
     while p.stack:

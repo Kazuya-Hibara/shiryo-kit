@@ -15,7 +15,7 @@
 | 別プロセス | `codex exec --help` や `claude --help` など、モデルを新しく起動する command が動くか。Codex の囲い (sandbox) の中では `--help` が動いても起動は失敗するので、検品の起動は囲いの外で行う (`review.md` §Codex) | subagent を使う (Codex では subagent の点検は「未検品」)。両方無ければ「未検品」 |
 | Web 取得 | 公的なページを 1 つ実際に取得してみる (例: e-Gov 法令検索) | 主張は全部「未確認」にして [要確認] を付け、利用者に「この環境では原典を取りに行けません」と伝える |
 | ファイル読取 | 渡された pptx・pdf・docx を 1 つ開いてみる | `markitdown` (Python) があれば使う。無ければ本文を貼ってもらう |
-| 書き出しの実行 | `node --version` (22 以上)、`python3 --version` (3.10 以上)、`python3 -c "import pptx"`、Chrome の有無。Codex では、囲いの外で実行する許可がもらえるか (囲いの中では Chrome が起動しない。`adapters.md` §2.1) | 本人の了承を得て準備する (何を入れるかを平易に説明する)。了承が無い・囲いの外で実行できない時は「pptx はまだ作れていません」と伝え、HTML と PDF 印刷の手順だけ渡す。代わりの変換器をその場で書かない |
+| 書き出しの実行 | `node --version` (22 以上)、`python3 --version` (3.10 以上)、`python3 -c "import pptx"`、Chrome の有無。Codex では、囲いの外で実行する許可がもらえるか (囲いの中では Chrome が起動しない。`adapters.md` §2.1) | 本人の了承を得て準備する (何を入れるかを平易に説明する)。Chrome が無い・囲いの外で実行できない時は、`build.py` が予備の書き出し (Python だけ) に自動で切り替える (`adapters.md` §2.2) ので、「描画の確認ができていない書き出しです」と伝える。python-pptx も入れられない時だけ「pptx はまだ作れていません」と伝え、HTML と PDF 印刷の手順を渡す。代わりの変換器をその場で書かない |
 | プレビュー表示 | `python3 scripts/preview.py <案件フォルダ>` が起動するか (`html-contract.md`) | ファイルを直接開いてもらう。修正は会話で受ける |
 
 ## P0 下調べ
@@ -66,7 +66,7 @@
 - 出力: `deck.html` (読み原稿を含む。形は `html-contract.md`)、求められた他の成果物。
 - 必要な能力: ファイル書込。
 - 前提: BRIEF.md に承認記録がある (関門 1)。
-- 失敗時: 型に合わない依頼 → 近い型を土台に組み替え、BRIEF の型欄に「組み替え」と書く。要件どうしが矛盾 → 根拠を見せて本人に 1 回で聞く (新しい事実による質問として扱う)。
+- 失敗時: 型に合わない依頼 → ヒアリングで本人が選んだ形 (「組み替え」か「型なし」。`hearing.md` §型の見せ方) に従い、BRIEF の型欄の通りに組む。要件どうしが矛盾 → 根拠を見せて本人に 1 回で聞く (新しい事実による質問として扱う)。
 - 判断の軸: `doctrine.md`。
 
 ## P5 検品
@@ -84,9 +84,11 @@
 - 目的: 本人が直せる形で渡す。
 - 入力: deck.html。
 - 出力: `out/` の pptx (本文がテキストボックス・表として直せる)、PDF、読み原稿。
-- 必要な能力: Node・Chrome・Python (python-pptx)。
-- 無い時: 準備の了承を得る。了承が無ければ HTML を渡し、pptx は作れていないと伝える。
-- 失敗時: `scripts/build.py` が失敗 → 出力の理由を読んで 1 回直す。Chrome・LibreOffice が起動しない (Codex の囲いの中など) → 囲いの外で実行する (`adapters.md` §2.1)。それもできなければ止まって「pptx はまだ作れていません」と伝える。`build.py` の代わりに即席の変換器を書かない。`build.py` 以外で作った file は「検品済み」と呼ばず、納品しない。`scripts/check.py pptx` で欠落・画像化が出たら、その版を納品しない。
+- 必要な能力: Node・Chrome・Python (python-pptx)。Chrome が無い時は Python (python-pptx) だけで予備の書き出し (PDF は LibreOffice があれば)。
+- 無い時: 準備の了承を得る。Chrome が使えなければ `build.py` が予備の書き出しに切り替える (`adapters.md` §2.2)。python-pptx も無く入れられなければ HTML を渡し、pptx は作れていないと伝える。
+- 失敗時: `scripts/build.py` が失敗 → 出力の理由を読んで 1 回直す。Chrome・LibreOffice が起動しない (Codex の囲いの中など) → Codex なら囲いの外で実行する許可を求める (`adapters.md` §2.1)。許可が無ければ予備の書き出しのまま渡し、「描画の確認ができていない書き出しです」と伝える。`build.py` の代わりに即席の変換器を書かない。`build.py` 以外で作った file は「検品済み」と呼ばず、納品しない。`scripts/check.py pptx` (Chrome が使えなければ自分で静的な比較に切り替える) で欠落・画像化・表の重なりが出たら、その版を納品しない。
+- 配布物 (配布 1 枚など): 本体の deck を書き出した後、`build.py handout.html --out out --handout` で同じ `out/` と記録に入れる。検品の時は `review_record.py start … --extra handout.html` で一緒に渡す (`html-contract.md` §5.2)。
+- 未検品で渡す時: `build.py deck.html --unreviewed` で書き出す (file 名と、各スライドの右上・文書のプロパティに「未検品」が入る。印の無い写しは作らない)。
 - 使い方: `html-contract.md`。代わりの描画部品: `adapters.md`。
 
 ## P7 修正

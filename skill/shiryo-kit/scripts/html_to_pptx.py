@@ -28,9 +28,11 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _deps import require_python_libs, require_node  # noqa: E402
+from _deps import BrowserUnavailable, require_python_libs, require_node  # noqa: E402
 
 require_python_libs()
+
+from pptx_metrics import make_room_below_tables  # noqa: E402
 
 from lxml import etree  # noqa: E402
 from pptx import Presentation  # noqa: E402
@@ -318,9 +320,54 @@ def run_dump(html, td, text_only=False):
         r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=900)
     except subprocess.TimeoutExpired:
         sys.exit("html_dump.mjs が 15 分で終わりませんでした。HTML が重すぎないか（画像・SVG の数）を確かめてください。")
+    if r.returncode == 3:  # ブラウザを起動・接続できない（html_dump.mjs の openPage の失敗）
+        raise BrowserUnavailable(f"Chrome を起動できない: {r.stderr.strip()[-1500:]}")
     if r.returncode != 0:
         sys.exit(f"html_dump.mjs 失敗: {r.stderr.strip()[-1500:]}")
     return json.loads((Path(td) / "dump.json").read_text(encoding="utf-8"))
+
+
+def assemble(data, deck, notes, out, author="", title=None, img_dir=None):
+    """描画の記録（html_dump.mjs の dump.json と同じ形）から PPTX を組み立てて保存する。戻り値 (スライド数, ノートの枚数)。
+    html_to_pptx_static.py（Chrome を使わない予備の書き出し）も同じ形の記録を作ってここを通す。"""
+    if len(data["slides"]) != len(deck.slides):
+        sys.exit(f"スライド数が合いません（描画 {len(data['slides'])} 枚 / HTML の読み取り {len(deck.slides)} 枚）。"
+                 " スライドの要素は <section class=\"s\"> を入れ子にせずに並べてください。")
+    sc = Scale(data["slideW"])
+    prs = Presentation()
+    prs.slide_width, prs.slide_height = SLIDE_W, SLIDE_H
+    blank = prs.slide_layouts[6]
+    layout_notes = []
+    for s in data["slides"]:
+        slide = prs.slides.add_slide(blank)
+        slide.background.fill.solid()
+        slide.background.fill.fore_color.rgb = rgb(s["bg"])
+        items = s["items"]
+        # 重なり順: 塗り・線・画像・表は HTML の順、文字はいちばん上
+        for it in items:
+            t = it["t"]
+            if t == "rect":
+                add_rect(slide, it, sc)
+            elif t == "line":
+                add_line(slide, it, sc)
+            elif t == "img":
+                p = Path(img_dir or ".") / it["file"]
+                if p.exists():
+                    slide.shapes.add_picture(str(p), sc(it["x"]), sc(it["y"]), sc(it["w"]), sc(it["h"]))
+            elif t == "table":
+                add_table(slide, it, sc)
+        for it in items:
+            if it["t"] == "text" and it["paras"]:
+                add_text(slide, it, sc)
+        # PowerPoint は Chrome より字幅が広く、表の行が折り返して伸びる。伸びる分を先に取り、下の物をずらす
+        for msg in make_room_below_tables(list(slide.shapes), SLIDE_H):
+            layout_notes.append(f"p{len(prs.slides)}: {msg}")
+    n_notes = add_notes(prs, notes)
+    set_neutral_props(prs, author, deck.title if title is None else title)
+    prs.save(out)
+    for msg in layout_notes:
+        print(f"注意: {msg}", file=sys.stderr)
+    return len(data["slides"]), n_notes
 
 
 def convert(html, out, notes=None, author="", title=None):
@@ -331,38 +378,7 @@ def convert(html, out, notes=None, author="", title=None):
         notes = [s.notes for s in deck.slides]
     with tempfile.TemporaryDirectory() as td:
         data = run_dump(html, td)
-        if len(data["slides"]) != len(deck.slides):
-            sys.exit(f"スライド数が合いません（描画 {len(data['slides'])} 枚 / HTML の読み取り {len(deck.slides)} 枚）。"
-                     " スライドの要素は <section class=\"s\"> を入れ子にせずに並べてください。")
-        sc = Scale(data["slideW"])
-        prs = Presentation()
-        prs.slide_width, prs.slide_height = SLIDE_W, SLIDE_H
-        blank = prs.slide_layouts[6]
-        for s in data["slides"]:
-            slide = prs.slides.add_slide(blank)
-            slide.background.fill.solid()
-            slide.background.fill.fore_color.rgb = rgb(s["bg"])
-            items = s["items"]
-            # 重なり順: 塗り・線・画像・表は HTML の順、文字はいちばん上
-            for it in items:
-                t = it["t"]
-                if t == "rect":
-                    add_rect(slide, it, sc)
-                elif t == "line":
-                    add_line(slide, it, sc)
-                elif t == "img":
-                    p = Path(td) / it["file"]
-                    if p.exists():
-                        slide.shapes.add_picture(str(p), sc(it["x"]), sc(it["y"]), sc(it["w"]), sc(it["h"]))
-                elif t == "table":
-                    add_table(slide, it, sc)
-            for it in items:
-                if it["t"] == "text" and it["paras"]:
-                    add_text(slide, it, sc)
-        n_notes = add_notes(prs, notes)
-        set_neutral_props(prs, author, deck.title if title is None else title)
-        prs.save(out)
-    return len(data["slides"]), n_notes
+        return assemble(data, deck, notes, out, author, title, img_dir=td)
 
 
 def main():

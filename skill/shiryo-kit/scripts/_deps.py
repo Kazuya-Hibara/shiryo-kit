@@ -10,6 +10,10 @@ HERE = Path(__file__).resolve().parent
 NODE_MIN = 22
 
 
+class BrowserUnavailable(SystemExit):
+    """Node・Chrome が無い・起動しない（描画の失敗とは分ける）。build.py の予備の書き出しと check.py pptx の静的な比較は、これの時だけ切り替える。"""
+
+
 def _pip_hint():
     if platform.system() == "Windows":
         return "py -m pip install python-pptx lxml"
@@ -43,14 +47,14 @@ def require_node():
     """Node 22+ のパスを返す。無い・古い時は対処を表示して止める。"""
     node = shutil.which("node")
     if not node:
-        sys.exit(f"Node.js が見つかりません（スライドの描画に Node.js {NODE_MIN} 以上が要ります）。\n入れ方: {node_hint()}")
+        raise BrowserUnavailable(f"Node.js が見つかりません（スライドの描画に Node.js {NODE_MIN} 以上が要ります）。\n入れ方: {node_hint()}")
     try:
         v = subprocess.run([node, "--version"], capture_output=True, text=True, timeout=60).stdout.strip()
     except (OSError, subprocess.TimeoutExpired):
         v = ""
     m = re.match(r"v(\d+)", v)
     if not m or int(m.group(1)) < NODE_MIN:
-        sys.exit(f"Node.js が古いか確認できません（{v or '不明'}）。{NODE_MIN} 以上が要ります。\n入れ方: {node_hint()}")
+        raise BrowserUnavailable(f"Node.js が古いか確認できません（{v or '不明'}）。{NODE_MIN} 以上が要ります。\n入れ方: {node_hint()}")
     return node
 
 

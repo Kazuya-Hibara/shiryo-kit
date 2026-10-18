@@ -73,6 +73,7 @@ Codex を WSL (Windows の中の Linux) で動かす時は、WSL の中の家の
 | U-02 | 書き出した pptx を実際の PowerPoint (Windows・Mac) で開いて、崩れと直しやすさ | README と agent-setup.md の「PowerPoint で開いた時の崩れは…」の段落と、各行の検証状況 |
 | U-03 | ChatGPT のデスクトップアプリの Annotate と、Claude のデスクトップアプリの要素選択で、実際に直せるか | agent-setup.md の「直したい時」の「未検証」と、対応環境の表の「使えない・弱い機能」 |
 | U-04 | 初めての士業の方 (同じような立場の 2〜3 名) が、迷わず使えるか・信用できると感じるか | README 全体の書き方と、各行の検証状況 |
+| U-05 | Claude の Cowork と ChatGPT の Work に `shiryo-kit-skill.zip` を入れ、入口から成果物まで通るか (スキルが入るか・Chrome が動くか、動かない時の予備の書き出し・PDF・別の AI による点検・メモの引き継ぎ) | README の「おすすめの使い方」の「利用者テストはまだ」と「未確認」、対応環境の表の Cowork・Work の行 |
 
 あわせて、利用者テストの前に作った側が確かめておくこと (README の「未検証」は外さない):
 
@@ -80,3 +81,27 @@ Codex を WSL (Windows の中の Linux) で動かす時は、WSL の中の家の
 - Windows の Codex が `%USERPROFILE%\.agents\skills` を読むか (§1 の推測)。
 - Codex で Free・Go の契約のまま gpt-6-astra を選べるか (§2)。
 - Claude Slides から書き出した pptx を `scripts/check.py pptx` で確かめ、文字が直せる形か・日本語の書体を記録する (§5)。
+
+## 7. Claude の Cowork・ChatGPT の Work (README の「おすすめの使い方」)
+
+調べた日は 2026-10-19 (日本時間)。Claude のヘルプは日本語のページがあったので、画面の名前は日本語のページの言葉を使いました。ChatGPT は英語のページしか確かめられていません (help.openai.com は取得が拒否された)。
+
+| 書いたこと | 根拠 |
+|---|---|
+| Claude: スキルは ZIP でアップロードする。「カスタマイズ」→「スキル」→「+」→「+ スキルを作成」→「スキルをアップロード」 | https://support.claude.com/ja/articles/12512180 (「Claudeでスキルを使用する」) —「スキルフォルダーをZIPファイルとしてパッケージ化します。」「カスタムスキルを追加するには、「+」ボタンをクリックしてから「+ スキルを作成」をクリックします。」「「スキルをアップロード」を選択します。」。手順の行は英語の名前で「Customize > Skills」、削除の手順では「カスタマイズ > スキル」と書かれている |
+| Claude: 「設定」→「機能」で「コード実行とファイル作成」を ON | 同じページ —「個別のFree、Pro、Maxプランの場合: Settings > Capabilitiesに移動し、コード実行とファイル作成が有効になっていることを確認します。」、トラブルシューティングに「設定 > 機能（Free、Pro、Max）」。Team は「組織レベルでデフォルトで有効」、Enterprise はオーナーが有効にする |
+| Claude: ZIP の形・description は 200 字まで | https://support.claude.com/ja/articles/12512198 (「カスタムスキルの作成方法」) —「フォルダ名がスキルの名前と一致することを確認します。」「ZIPはスキルフォルダをルートとして含める必要があります（サブフォルダではなく）。」、description は「（最大 200 文字）」。`tools/build_skill_zip.py` はこれに合わせる |
+| Cowork は有料プランだけ。メッセージ欄で「Cowork」を選ぶ | https://support.claude.com/ja/articles/13345190 (「Claude Coworkを始める」) —「Claude Coworkは有料プラン（Pro、Max、Team、Enterprise）で利用できます。」「メッセージボックスで「Cowork」を選択します。」。「Chat」と「Cowork」の選択が無い新しい画面では「すべての会話がCoworkタスクを実行できます」 |
+| Cowork の作業は Anthropic のサーバーで動き、アカウントに保存される | 同じページ —「Claudeの作業はAnthropicのサーバー上の隔離された環境で実行され、セッションとファイルはClaudeアカウントに保存されます。」 |
+| ChatGPT: 自分のスキルをそのまま使えるのはデスクトップアプリ | https://learn.chatgpt.com/docs/build-skills —「Standalone skills are available in the ChatGPT desktop app, Codex CLI, and IDE extension. Skills bundled in plugins are also available in Chat and Work across ChatGPT on the web, desktop, and mobile.」「In the ChatGPT desktop app, open Skills in the sidebar to view and explore skills created across your projects.」「In ChatGPT, type @ to select a skill.」 |
+| ChatGPT: 「Work」に切り替える | https://learn.chatgpt.com/docs/get-started-with-work —「First, switch to Work.」 |
+| ChatGPT: Work は無料を含む全プランに入っている | https://learn.chatgpt.com/docs/pricing —「ChatGPT Work and Codex are included in your ChatGPT Free, Go, Plus, Pro, Business, Edu, or Enterprise plan」。Free・Go は「GPT-6 Luna at Standard speed in the desktop app, subject to rollout」 |
+
+**確かめられなかったこと (README では「未確認」と書いた):**
+
+- ChatGPT で、自分のスキルを ZIP から追加する画面の手順と名前。公式のページ (learn.chatgpt.com) には、プラグインの作り方 (https://developers.openai.com/plugins/build/plugins の `plugin.json` と `skills/<名前>/SKILL.md`、手元の marketplace の JSON を置いてデスクトップアプリを再起動する) と、会話で作る「Plugin Creator」(https://learn.chatgpt.com/docs/build-plugins) しか書かれていない。ふつうの利用者が ZIP を入れる手順は help.openai.com にあるらしいが、開けなかった。
+- `install.sh --codex` で `~/.agents/skills` に入れたスキルが、ChatGPT のデスクトップアプリの Work からも見えるか (公式に書かれているのは Codex が読むことだけ)。
+- ChatGPT の無料・Go のプランで自分のスキルを入れられるか。Work で gpt-6-astra を選べるか。
+- Claude で、アップロードした自分のスキルが Cowork の作業の中でも使われるか (共有したスキルは「チャットとCoworkの両方で機能します」とあるが、自分で入れたスキルについての一文は無い)。
+- Cowork・Work の中に Chrome・LibreOffice・Node.js があるか (どの公式ページにも書かれていない)。無い時の予備の書き出しは shiryo-kit 側で用意した (README の「Cowork・Work の中で起こりうること」)。
+

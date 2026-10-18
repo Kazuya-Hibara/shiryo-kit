@@ -219,7 +219,10 @@ def deck_units(deck, label=""):
     units = []
     for s in deck.slides:
         units += [(s.index, f"{pre}p{s.index} 本文", b.ledger_text, b.text) for b in s.blocks]
-        units += [(s.index, f"{pre}p{s.index} 読み原稿", line, line) for line in s.notes.split("\n") if line.strip()]
+        # 読み原稿の行: data-ledger="skip" の部分（架空の例など）は照合しない。[要確認] は行の全体で探す
+        lines = s.notes.split("\n")
+        led = s.notes_ledger if len(s.notes_ledger) == len(lines) else lines
+        units += [(s.index, f"{pre}p{s.index} 読み原稿", lt, line) for line, lt in zip(lines, led) if line.strip()]
     return units
 
 

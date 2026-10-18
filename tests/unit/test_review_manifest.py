@@ -17,6 +17,7 @@ def filled_request(n=1, extra=""):
     """references/review.md の雛形の <…> を埋めただけの依頼文（extra は雛形に無い行）。"""
     doc = (SCRIPTS.parent / "references" / "review.md").read_text(encoding="utf-8")
     body = re.search(r"## reviewer への依頼文.*?```markdown\n(.*?)\n```", doc, re.S).group(1)
+    body = "\n".join(ln for ln in body.splitlines() if "<配布物の HTML>" not in ln)  # 配布物が無い時は行を消す
     for k, v in (("<案件フォルダ>", "/work/資料/case"), ("<skill>", "/skills/shiryo-kit"), ("<案件>", "テストの案件"),
                  ("<n>", str(n)), ("<名前>", "deck"), (" <ほかの成果物>", ""), ("<BRIEF の spec_rev をそのまま>", "1")):
         body = body.replace(k, v)

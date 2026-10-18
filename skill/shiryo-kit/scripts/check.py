@@ -9,13 +9,14 @@
   python3 check.py pptx   deck.pptx deck.html [--static] [--overflow warn]   # 書き出した pptx の読み戻し検査
   python3 check.py review-evidence review/            # 別の文脈で検品した記録が揃っているか（揃わなければ「未検品」）
   python3 check.py manifest out/ review/              # 渡す file が、検品した版から書き出したものか（sha256 で照合）
+  python3 check.py versions versions.md               # 版の記録の表の形（どの行も見出しと同じ列の数・状態の語）
   ledger に --sources sources/ を付けると、確認済みの引用を保存した原典の本文と照らす（省略時は台帳の隣の sources/）
 
 行の頭: FAIL = 直す / WARN = 目で確かめる（WARN だけなら exit 0）/ OK = 合格の要約。
   deck   に --strict を付けると WARN も不合格にする。
   pptx   は Chrome で HTML を描いて「描かれた文字」と pptx の文字を比べる（--static は Chrome を使わず HTML を静的に読む）。
          はみ出しは推定（字数 × 字の大きさ ÷ 箱の幅）。--overflow warn で WARN に下げる。
-依存: deck / ledger / pii / review-evidence / manifest = 標準ライブラリだけ。pptx = python-pptx・lxml（+ 既定では Node.js 22 以上と Chrome）。
+依存: deck / ledger / pii / review-evidence / manifest / versions = 標準ライブラリだけ。pptx = python-pptx・lxml（+ 既定では Node.js 22 以上と Chrome）。
 """
 import math
 import re
@@ -203,7 +204,7 @@ def _norm_chars(text):
     for line in text.splitlines():
         line = re.sub(r"^\s*[•・·–\-]\s+", "", line)  # 打った行頭記号は pptx では箇条書き書式になる
         lines.append(line)
-    t = unicodedata.normalize("NFKC", "\n".join(lines))
+    t = unicodedata.normalize("NFKC", "\n".join(lines)).casefold()  # 大文字・小文字の違い（CSS の text-transform）は欠落に数えない
     return re.sub(r"\s+", "", t)
 
 
@@ -222,59 +223,26 @@ def _shape_texts(shapes):
             yield sh.text_frame.text, sh
 
 
-def _char_w(ch):
-    if ch in " \t":
-        return 0.3
-    ea = unicodedata.east_asian_width(ch)
-    if ea in ("W", "F", "A"):
-        return 1.0
-    if ch.isupper() or ch.isdigit():
-        return 0.62
-    return 0.52
-
-
-def _para_metrics(p, default_size=18.0):
-    sizes = [r.font.size.pt for r in p.runs if r.font.size]
-    size = max(sizes) if sizes else default_size
-    ls = p.line_spacing
-    if ls is None:
-        lsp = size * 1.2
-    elif isinstance(ls, float):
-        lsp = size * 1.2 * ls
-    else:
-        lsp = ls.pt
-    text = "".join(r.text for r in p.runs)
-    em = sum(_char_w(c) for c in text)
-    marL = p._p.pPr.get("marL") if p._p.pPr is not None else None
-    indent = int(marL) / 12700 if marL else 0.0
-    return size, lsp, em * size, indent, text
+from pptx_metrics import h_overlap, is_content, para_metrics as _para_metrics, table_growth, wrap_lines  # noqa: E402
 
 
 def overflow_issues(slide, idx, slide_w, slide_h):
     out = []
-    for sh in slide.shapes:
+    shapes = list(slide.shapes)
+    for sh in shapes:
         if getattr(sh, "has_table", False) and sh.has_table:
-            tbl = sh.table
-            total = 0.0
-            for ri, row in enumerate(tbl.rows):
-                need = row.height / 12700
-                for ci, cell in enumerate(row.cells):
-                    if cell.is_spanned:
-                        continue
-                    w = sum(tbl.columns[c].width for c in range(ci, ci + max(1, cell.span_width))) / 12700
-                    w -= (cell.margin_left + cell.margin_right) / 12700
-                    h = (cell.margin_top + cell.margin_bottom) / 12700
-                    for p in cell.text_frame.paragraphs:
-                        size, lsp, width, ind, text = _para_metrics(p, 10)
-                        if not text:
-                            continue
-                        h += max(1, math.ceil(width / max(1.0, w - ind) - 0.03)) * lsp
-                    if cell.span_height <= 1:
-                        need = max(need, h)
-                total += need
-            bottom = sh.top / 12700 + total
+            declared, total, _ = table_growth(sh)
+            top = sh.top / 12700
+            bottom = top + total
             if bottom > slide_h / 12700 + 2:
                 out.append(f"p{idx}: 表が下にはみ出しそう（推定の下端 {bottom:.0f}pt > スライド {slide_h / 12700:.0f}pt）")
+            # 行が折り返しで伸びると、表の下に置いた物（出典の行など）にかぶる。PowerPoint・LibreOffice は表を下へ伸ばす
+            below = [o for o in shapes if o is not sh and is_content(o) and o.top is not None
+                     and top + 2 < o.top / 12700 < bottom - 1 and h_overlap(sh, o)]
+            for o in below[:2]:
+                label = (o.text_frame.text if o.has_text_frame else "表").strip().replace("\n", " ")[:24]
+                out.append(f"p{idx}: 表（行が折り返して伸びた時の推定を含む）が、下の「{label}」に重なりそう"
+                           f"（表の下端の推定 {bottom:.0f}pt > 下の物の上端 {o.top / 12700:.0f}pt。build.py で書き出し直すか、表の下を空ける）")
             continue
         if not sh.has_text_frame or not sh.text_frame.text.strip():
             continue
@@ -290,9 +258,8 @@ def overflow_issues(slide, idx, slide_w, slide_h):
             if not text:
                 need += lsp
                 continue
-            avail = max(1.0, w - ind)
             widest = max(widest, width + ind)
-            lines = 1 if tf.word_wrap is False else max(1, math.ceil(width / avail - 0.03))
+            lines = 1 if tf.word_wrap is False else wrap_lines(text, size, w - ind)
             need += lines * lsp
         label = sh.text_frame.text.strip().replace("\n", " ")[:24]
         if tf.word_wrap is False and widest > w * 1.08 + 3:
@@ -315,10 +282,15 @@ def cmd_pptx(pptx_path, html_path, static=False, overflow="fail"):
     fails, warns = [], []
     rendered = None
     if not static:
+        from _deps import BrowserUnavailable
         from html_to_pptx import run_dump
-        with tempfile.TemporaryDirectory() as td:
-            data = run_dump(html_path, td, text_only=True)
-        rendered = [s.get("text", "") for s in data["slides"]]
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                data = run_dump(html_path, td, text_only=True)
+            rendered = [s.get("text", "") for s in data["slides"]]
+        except BrowserUnavailable as e:  # Node・Chrome が無い・起動しない（Claude や ChatGPT のアプリの中など）→ 静的な比較に切り替える
+            static = True
+            warns.append(f"Chrome で描けないので、静的な比較に切り替えた（{str(e).strip().splitlines()[0][:80]}）")
     html_texts = rendered if rendered is not None else [s.text for s in deck.slides]
     slides = list(prs.slides)
     if len(slides) != len(html_texts):
@@ -348,6 +320,9 @@ def cmd_pptx(pptx_path, html_path, static=False, overflow="fail"):
         if big and (hs is None or not hs.has_media):
             warns.append(f"p{i}: スライドの半分以上を画像が占めている（HTML に img・svg が無い。CSS の背景画像でなければ、"
                          f"スライドが絵として書き出されていないか確かめる）")
+        if hs is not None and hs.has_media and pics == 0:
+            warns.append(f"p{i}: HTML に画像・図が {hs.has_media} 個あるのに、pptx に画像が無い（予備の書き出しでは図は中の文字だけ。"
+                         "ロゴ・グラフが要るなら貼り直すか、Chrome のある環境で書き出し直す）")
         if hs is not None and hs.has_table > tables:
             fails.append(f"p{i}: HTML の表 {hs.has_table} 個に対し PowerPoint の表が {tables} 個（表が図や文字の箱になっている）")
         if hs is not None and hs.notes.strip():
@@ -411,7 +386,7 @@ def cmd_manifest(out_dir, review_dir):
             fails.append(f"書き出しの元の {deck.get('path')} が見つからない")
         elif sha256(dp) != deck_sha:
             fails.append(f"書き出した後に {dp.name} が変わった（build.py で書き出し直してから検品し直す）")
-    listed = set()
+    listed, extra_src = set(), {}
     for o in m.get("outputs", []):
         f = out / o.get("file", "")
         listed.add(f.name)
@@ -419,7 +394,16 @@ def cmd_manifest(out_dir, review_dir):
             fails.append(f"記録にある {o.get('file')} が無い")
         elif sha256(f) != o.get("sha256"):
             fails.append(f"{f.name} が書き出した後に変わった（手で直した file は渡さない。HTML を直して書き出し直す）")
-        if deck_sha and o.get("deck_sha256") != deck_sha:
+        sp = o.get("source")
+        if sp and deck.get("path") and (out / sp).resolve() != (out / deck["path"]).resolve():
+            # 配布物など本体の deck 以外から書き出した物: 元の file が今の版で、検品の入力に入っていること
+            src = (out / sp).resolve()
+            if not src.exists():
+                fails.append(f"{f.name} の元の {sp} が見つからない")
+            elif sha256(src) != o.get("deck_sha256"):
+                fails.append(f"{f.name} は今の {src.name} より前の版から書き出したもの（書き出し直す）")
+            extra_src[src.name] = o.get("deck_sha256")
+        elif deck_sha and o.get("deck_sha256") != deck_sha:
             fails.append(f"{o.get('file')} は今の deck より前の版から書き出したもの")
     if not m.get("outputs"):
         fails.append("書き出した file の記録が無い")
@@ -442,13 +426,64 @@ def cmd_manifest(out_dir, review_dir):
         br = m.get("brief") or {}
         if br.get("sha256") and h.get("brief") != br["sha256"]:
             fails.append(f"未検品: 書き出した時の BRIEF は {last.n} 巡目で検品した BRIEF と違う")
+        ex = last.record.get("extra_inputs_sha256") or {}
+        for name, sh in sorted(extra_src.items()):
+            if ex.get(name) != sh:
+                fails.append(f"未検品: 配布物 {name} は {last.n} 巡目の検品に入っていない（review_record.py start に "
+                             f"--extra {name} を付け、依頼文にも書いて検品し直す）")
     if fails:
         return emit(fails, warns)
     state = "検品済み" if last.verdict == "合格" else "検品済み・指摘が残っています"
+    if m.get("export_mode") == "python-fallback":
+        why = f"。理由: {m['fallback_reason']}" if m.get("fallback_reason") else ""
+        warns.append("書き出しの方法=予備（python-fallback）: 描画の確認ができていない書き出しです。利用者にそう伝え、"
+                     f"PowerPoint で開いて、はみ出し・重なりを目で確かめてもらう{why}")
     if last.verdict != "合格":
         warns.append(f"{last.n} 巡目の結論が「{last.verdict}」（直してもう一度検品するか、本人の判断を BRIEF の決定ログに残してから渡す）")
     files = ", ".join(sorted(listed))
-    return emit([], warns, [f"manifest: 状態={state}（review-{last.n}・渡せる file: {files}）"])
+    how = {"python-fallback": "予備（描画の確認なし）", "text": "文字だけ"}.get(m.get("export_mode"), "Chrome")
+    return emit([], warns, [f"manifest: 状態={state}（review-{last.n}・書き出し={how}・渡せる file: {files}）"])
+
+
+VERSION_STATES = ("作業中", "検品済み", "検品済み・指摘が残っています", "未検品", "納品済み")
+
+
+def _cells(line):
+    s = line.strip()
+    if not (s.startswith("|") and s.endswith("|")):
+        return None
+    return [c.strip() for c in re.split(r"(?<!\\)\|", s[1:-1])]
+
+
+def cmd_versions(path):
+    """versions.md: 表の見出しと同じ列の数・状態の語（references/revision.md §4）。手で書いた行のずれを見つける。"""
+    p = Path(path)
+    if not p.exists():
+        return emit([f"{p} が無い（references/revision.md §4 の形で作る）"], [])
+    lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
+    fails, warns, head, n_rows = [], [], None, 0
+    for i, line in enumerate(lines, 1):
+        cells = _cells(line)
+        if cells is None:
+            continue
+        if head is None:
+            head = cells
+            continue
+        if all(re.fullmatch(r":?-{3,}:?", c) for c in cells):
+            continue
+        n_rows += 1
+        if len(cells) != len(head):
+            fails.append(f"{p.name}:{i}: 列が {len(cells)} 個（見出しは {len(head)} 個）。セルの中の | は \\| と書く: {line.strip()[:60]}")
+            continue
+        if "状態" in head:
+            st = cells[head.index("状態")]
+            if not any(st.startswith(s) for s in VERSION_STATES):
+                warns.append(f"{p.name}:{i}: 状態「{st[:20]}」が決まった語（{' / '.join(VERSION_STATES)}）で始まっていない")
+    if head is None:
+        fails.append(f"{p.name}: 版の表が無い")
+    elif n_rows == 0:
+        fails.append(f"{p.name}: 版の行が無い")
+    return emit(fails, warns, [] if fails else [f"versions: {n_rows} 行・{len(head)} 列"])
 
 
 def main():
@@ -495,6 +530,8 @@ def main():
         return cmd_review_evidence(args[0])
     if cmd == "manifest" and len(args) >= 2:
         return cmd_manifest(args[0], args[1])
+    if cmd == "versions" and args:
+        return cmd_versions(args[0])
     print(__doc__)
     return 2
 

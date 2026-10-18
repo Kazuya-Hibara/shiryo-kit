@@ -5,7 +5,7 @@ description: >-
   士業 (社労士など)・中小企業向けの日本語資料を、作る前にヒアリングで目的・受け手・成果物を聴き切り (保存したメモを推奨答にする)、法令・制度・金額・日付は原典を取得して引用つきで確かめ (確かめられない所は [要確認] と出して数字を作らない)、本人の過去資料から口調を反映し、作り手と別の文脈で検品してから、編集できる pptx・PDF・読み原稿に書き出す。
 license: MIT
 compatibility: >-
-  Claude Code と Codex (CLI・デスクトップアプリ) で同じフォルダのまま動く。pptx/PDF の書き出しには Node.js 22 以上、Google Chrome、Python 3.10 以上と python-pptx が要る (無ければ初回に本人の了承を得て準備する)。原典の確認には Web 取得が要る (無い環境では全部 [要確認] になる)。
+  Claude Code と Codex (CLI・デスクトップアプリ) で同じフォルダのまま動く。pptx/PDF の書き出しには Node.js 22 以上、Google Chrome、Python 3.10 以上と python-pptx が要る (無ければ初回に本人の了承を得て準備する。Chrome が使えない環境では python-pptx だけの予備の書き出しに切り替わり、PDF は LibreOffice があれば作る)。原典の確認には Web 取得が要る (無い環境では全部 [要確認] になる)。
 ---
 
 # shiryo-kit — 聴き切ってから作る、嘘のない資料
@@ -48,7 +48,7 @@ compatibility: >-
 ### P0 下調べ (質問の前に)
 
 1. 保存メモを探す。作業フォルダとその親に `資料メモ/` があるか見て、「メモが見つかりました: <path>」か「メモは見つかりませんでした」と必ず言う。置き場所と中身は `references/memory.md`。
-2. 事務所共通のメモと、今回の顧問先・今回の回に当たる案件限定メモだけを読む。別の顧問先の案件限定メモは読まない。`資料メモ/訂正ログ.md` に「使わない」とある内容は使わない。
+2. 事務所共通のメモを読む。案件限定メモは、`資料メモ/案件/` の file 名の一覧だけを見て (`ls`)、今回の顧問先の同じ回の続きに当たる file だけを開く。別の顧問先のメモは開かない。同じ顧問先でも別の回のメモは、本人が「使って」と言った時のほかは開かず、その受け手・場面を推奨答にしない (手順は `references/memory.md` §読む時)。`資料メモ/訂正ログ.md` に「使わない」とある内容は使わない。
 3. 渡された過去資料・参考資料を読む。量が多い時は subagent に読ませ、要点と口調の抜き出しだけを受け取る (`references/voice.md`、`references/attention.md`)。読む途中で見えた顧問先の個人情報は写さない。
 4. 読んだ物・読まなかった物 (読めなかった理由つき) を一覧で見せる。聞かずに埋まったことは、P1 の推奨答として使う。
 
@@ -58,9 +58,9 @@ compatibility: >-
 
 - 知る必要があること: 目的 / 受け手 (persona) / 持ち帰らせたい行動 / 場面 (時間・会場・話すのか配るのか) / 資料の基準日と使う日 / 入れること・言わないこと / 使える資料 / 口調 / 型 / 成果物 (スライド・PDF・読み原稿・配布資料のどれが要るか)。
 - **止める項目** = 目的・受け手・成果物。どれかが空なら作らない。それ以外は、本人が了承した仮定で進めてよい。
-- 1 回の問いかけで、今聞ける問いを全部まとめて出す。各問に推奨答を付け (前回の答えがあればそれ)、「はい」や番号で答えられる形にする。質問 UI があれば使い、無ければ番号付きの文章で聞く。
+- 問いはまとめて出すが、1 回は 7 問まで。止める項目と、答えで他が変わる問いを先の回に、残りを次の回に出す。どの問いも捨てない。各問に推奨答を付け (前回の答えがあればそれ。ただし別の回の案件限定の値は推奨答にしない)、「はい」や番号で答えられる形にする。質問 UI があれば使い、無ければ番号付きの文章で聞く。
 - 答えはそのまま確定せず、必要なものは疑って確かめる (言い換え・実例・一段上の目的)。
-- 型はプレビュー (`assets/kata/`) を見せて選んでもらう。言葉だけで好みを聞かない。
+- 型はプレビュー (`assets/kata/`) を見せて選んでもらう。言葉だけで好みを聞かない。4 つの型 (セミナー / 顧問先説明 / 提案 / 報告) は名前と 1 行の説明で全部示す。画像を見せられない環境では、そう言ってから画像の場所を伝える。型に無い依頼は「近い型を組み替える」か「型なしで組む」かを本人に選んでもらい、BRIEF の型の行に書く。
 - 最後に要約を読み上げる。本人の言葉と、こちらの推測を分けて書く (推測には「(推測)」)。本人の承認で BRIEF を確定する。
 
 **終わる条件**: 止める項目が全部確定し、残りが確定か了承済みの仮定か「未確定 (理由つき)」になり、要約に本人が承認した。
@@ -74,7 +74,7 @@ compatibility: >-
 
 ### P4a 骨子
 
-型を選び (`assets/kata/`、型に無い依頼は近い型を土台に組み替える)、タイトル列だけの骨子を作る。タイトルは結論を 1 文で言う。判断の軸は `references/doctrine.md`。
+BRIEF の型の行に従い (`assets/kata/`。型に無い依頼は、本人が選んだ「組み替え」か「型なし」で組む)、タイトル列だけの骨子を作る。タイトルは結論を 1 文で言う。判断の軸は `references/doctrine.md`。
 骨子を本人に見せるかはモデルが判断してよい。見せるのは確認であり、新しい質問の機会ではない。
 
 ### P3 出典台帳
@@ -94,12 +94,12 @@ HTML スライドと、求められた成果物 (読み原稿・配布資料) �
 
 `python3 scripts/build.py <deck.html> --out <案件フォルダ>/out` で pptx・PDF・読み原稿と、書き出しの記録 `out/manifest.json` を作る (`--formats` で絞れる。詳細は `references/html-contract.md`)。
 Codex では、`build.py` と `check.py pptx` を囲い (sandbox) の外で実行する (囲いの中では Chrome が起動しない)。利用者に一度だけ許可をもらう手順は `references/adapters.md` §2.1。
-書き出せない環境 (許可がもらえない時を含む) では HTML のまま検品に進み、利用者に「pptx はまだ作れていません」と理由つきで伝える。代わりの変換器をその場で書かない。`build.py` 以外で作った file は納品せず、「検品済み」と呼ばない。描画部品の差し替えは `references/adapters.md`。
+Chrome が無い・起動しない環境 (Claude のアプリ・ChatGPT の Work・許可がもらえない Codex の囲いの中など) では、`build.py` が製品同梱の予備の書き出し (Python だけ) に自動で切り替える。その時は報告に「描画の確認ができていない書き出しです」と書き、PDF が作れたかを伝える (`references/adapters.md` §2.2)。python-pptx も使えない時だけ「pptx はまだ作れていません」と伝える。代わりの変換器をその場で書かない。`build.py` 以外で作った file は納品せず、「検品済み」と呼ばない。配布物は `--handout`、未検品で渡す時は `--unreviewed` (`references/html-contract.md` §3)。描画部品の差し替えは `references/adapters.md`。
 
 ### P5 検品 (作り手と別の文脈)
 
-1. 機械チェックを通す: `python3 scripts/check.py deck deck.html`、`python3 scripts/check.py ledger ledger.md deck.html [ほかの成果物 ...]` (台帳の隣の `sources/` があれば、引用を原典の本文と自動で照らす)、pptx があれば `python3 scripts/check.py pptx out/<名前>.pptx deck.html`、顧問先名や個人名の残りを見る `python3 scripts/check.py pii deck.html`。
-2. reviewer を作り手と別の文脈で起動する (Claude Code = 会話を引き継がない subagent、Codex = 新しい `codex exec` プロセスを囲いの外で起動。Codex の subagent での点検は「未検品」。`references/review.md` §起動の仕方)。巡ごとに新しい reviewer を起動する。渡すのは `BRIEF.md`・`ledger.md`・`deck.html` の 3 つの path だけ。作り手の説明・会話・前の検品結果は渡さない。
+1. 機械チェックを通す: `python3 scripts/check.py deck deck.html`、`python3 scripts/check.py ledger ledger.md deck.html [ほかの成果物 ...]` (台帳の隣の `sources/` があれば、引用を原典の本文と自動で照らす)、pptx があれば `python3 scripts/check.py pptx out/<名前>.pptx deck.html` (Chrome が使えなければ自分で静的な比較に切り替える)、顧問先名や個人名の残りを見る `python3 scripts/check.py pii deck.html`。
+2. reviewer を作り手と別の文脈で起動する (Claude Code = 会話を引き継がない subagent、Codex = 新しい `codex exec` プロセスを囲いの外で起動。Codex の subagent での点検は「未検品」。`references/review.md` §起動の仕方)。巡ごとに新しい reviewer を起動する。渡すのは `BRIEF.md`・`ledger.md`・`deck.html` の 3 つの path だけ (配布物 (配布 1 枚など) があれば、`review_record.py start … --extra <配布物の HTML>` で足し、依頼文の雛形の「配布物:」の行を残す (無ければその行を消す))。作り手の説明・会話・前の検品結果は渡さない。
 3. reviewer は原典との一致・言い過ぎ・要件の充足・受け手として読めるかを点検し、結果を `review/review-<n>.md` に書く。
 4. 起動は `scripts/review_record.py` を通す (subagent なら起動の直前に `start review --round <n>`、返事の直後に `finish review --round <n> --reviewer-id <id>`。別プロセスなら `run review --round <n> --stdin review/request-<n>.md -- <起動 command>`)。時刻・pid・終了コード・渡した path の sha256 は script が `review/independence-<n>.json` に書く。進行役は手で書かない。その後 `python3 scripts/check.py review-evidence review` を通す。通らない検品は無かったものとして扱う。
 5. 直しは既定で 2 巡まで。収まらなければ、残った指摘を本人に見せて判断を仰ぐ。
@@ -108,10 +108,11 @@ Codex では、`build.py` と `check.py pptx` を囲い (sandbox) の外で実�
 
 ### 納品
 
-`python3 scripts/check.py manifest out review` を通してから渡す (渡す file の sha256 が検品した file と一致する時だけ通る)。通らなければ検品し直すか、「未検品」として渡す。`versions.md` に版を記録する。最後の報告には次を必ず入れる:
+`python3 scripts/check.py manifest out review` を通してから渡す (渡す file の sha256 が検品した file と一致する時だけ通る)。通らなければ検品し直すか、「未検品」として渡す。`versions.md` に版を記録し、`python3 scripts/check.py versions versions.md` で表の形を確かめる。最後の報告には次を必ず入れる:
 
 - 成果物の場所
 - 検品の状態 (「検品済み」「検品済み・指摘が残っています」「未検品」のどれか) と、その理由
+- 予備の書き出しで作った時は「描画の確認ができていない書き出しです」(`out/manifest.json` の `export_mode` が `python-fallback`)
 - [要確認] の件数と一覧 (何を・どこで確かめればよいか)
 - 本人提供の情報 (原典で照合していないもの)
 - 読んだ物・外に送った物 (検索した言葉・取得した URL)・保存した物の一覧
@@ -123,7 +124,7 @@ Codex では、`build.py` と `check.py pptx` を囲い (sandbox) の外で実�
 
 ### P8 メモリー
 
-案件の終わり (または本人が望んだ時) に、次回も使えそうなことを、事務所共通 (話し手・事務所の紹介、口調、型の好み、よく使う出典) と案件限定 (その顧問先・その回の聴衆) に分けて案を作る。
+案件の終わり (または本人が望んだ時) に、次回も使えそうなことを、事務所共通 (話し手・事務所の紹介、口調、型の好み、よく使う出典) と案件限定 (その顧問先・その回の聴衆。回ごとに別の file) に分けて案を作る。顧問先は呼び名で書き、正式名は保存しない。
 案を `資料メモ/.保存前/` に書いて `python3 scripts/check.py pii 資料メモ/.保存前` を通し、本人に見せ、了承された分だけ保存する。次回は P0 でこれを読み、推奨答にする。訂正・削除・今回だけの上書きの扱いは `references/memory.md`。
 
 ## 案件フォルダ

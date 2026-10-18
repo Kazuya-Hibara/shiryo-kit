@@ -138,6 +138,13 @@ def check_round(review_dir, n, now=None):
                 F(f"{n} 巡目: 検品に渡した {inputs[k]} が今は無い")
             elif hashes.get(k) != sha256(f):
                 F(f"{n} 巡目: 検品の後に {inputs[k]} が変わった（今の版は検品していない）")
+    ex_in, ex_h = rec.get("extra_inputs") or {}, rec.get("extra_inputs_sha256") or {}
+    for name, rel in sorted(ex_in.items()) if isinstance(ex_in, dict) else []:
+        f = (case / rel) if not Path(rel).is_absolute() else Path(rel)
+        if not f.exists():
+            F(f"{n} 巡目: 検品に渡した {rel} が今は無い")
+        elif ex_h.get(name) != sha256(f):
+            F(f"{n} 巡目: 検品の後に {rel} が変わった（今の版は検品していない）")
     req = d / str(rec.get("request_file") or f"request-{n}.md")
     if not req.exists():
         F(f"{n} 巡目: 依頼文 {req.name} が無い")
@@ -149,6 +156,9 @@ def check_round(review_dir, n, now=None):
             for k in sorted(INPUT_KEYS & set(inputs)):
                 if Path(inputs[k]).name not in rt:
                     r.warns.append(f"{n} 巡目: 依頼文に {Path(inputs[k]).name} の path が無い")
+        for name in sorted(ex_in) if isinstance(ex_in, dict) else []:
+            if name not in rt:
+                F(f"{n} 巡目: 依頼文に配布物 {name} が無い（reviewer に渡していない物は検品済みにならない）")
     # 結果の file: 起動〜終了の間に書かれ、その後書き換えられていない
     res = d / str(rec.get("result_file") or f"review-{n}.md")
     if not res.exists():

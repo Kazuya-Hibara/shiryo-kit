@@ -15,7 +15,7 @@ check.py review-evidence / check.py manifest がこの記録を読む（形は r
 
 記録するもの（review/independence-<n>.json）:
   method（subagent / fresh-process）・started_at / ended_at（この script が時計から取る）・inputs（BRIEF.md・ledger.md・deck.html の
-  3 つだけ）と start の時点の sha256・依頼文 review/request-<n>.md の sha256・reviewer_id・exit_status・結果 review/review-<n>.md の
+  3 つ。配布物は --extra handout.html で extra_inputs に足す）と start の時点の sha256・依頼文 review/request-<n>.md の sha256・reviewer_id・exit_status・結果 review/review-<n>.md の
   sha256 と更新時刻・run の時は pid と出力（review/run-<n>.jsonl）の sha256。
 start の前に review/request-<n>.md を書いておく（無いと止まる。references/review.md の雛形に無い行があっても止まる）。
 finish は review/review-<n>.md が無いと止まる。
@@ -93,6 +93,7 @@ SLOTS = {
     "<案件>": r"[^。、「」\n]+?",
     "<名前>": r"[^\s/\\。、「」]+",
     "<ほかの成果物>": rf"(?:{_FILE}(?:\s+{_FILE})*)?",
+    "<配布物の HTML>": _FILE,
 }
 
 
@@ -167,6 +168,15 @@ def cmd_start(a, method=None):
             die(f"検品に渡す file が無い: {f}")
         inputs[key] = os.path.relpath(f, case)
         hashes[key] = sha256(f)
+    extra_in, extra_hash = {}, {}
+    for e in getattr(a, "extra", None) or []:
+        f = Path(e)
+        if not f.is_absolute():
+            f = (Path.cwd() / f).resolve()
+        if not f.exists():
+            die(f"検品に渡す file が無い: {f}")
+        extra_in[f.name] = os.path.relpath(f, case)
+        extra_hash[f.name] = sha256(f)
     extra = request_deviations(ps["request"], {INPUT_NAMES[k]: Path(v).name for k, v in inputs.items()})
     if extra:
         die(f"依頼文 {ps['request']} に、雛形（references/review.md §reviewer への依頼文）に無い行がある。"
@@ -186,6 +196,7 @@ def cmd_start(a, method=None):
         "codex_env": any(k in os.environ for k in CODEX_ENV_KEYS),
         "inputs": inputs,
         "inputs_sha256": hashes,
+        **({"extra_inputs": extra_in, "extra_inputs_sha256": extra_hash} if extra_in else {}),
         "request_file": ps["request"].name,
         "request_sha256": sha256(ps["request"]),
         "reviewer_id": None,
@@ -320,6 +331,8 @@ def main():
         p.add_argument("--brief", help="BRIEF の path（既定: 案件フォルダの BRIEF.md）")
         p.add_argument("--ledger", help="出典台帳の path（既定: 案件フォルダの ledger.md）")
         p.add_argument("--deck", help="スライドの path（既定: 案件フォルダの deck.html）")
+        p.add_argument("--extra", action="append", default=[],
+                       help="一緒に検品する配布物の HTML など（何度でも。check.py manifest が配布物の照合に使う）")
         p.add_argument("--force", action="store_true", help="同じ巡の記録を書き直す")
 
     p = sub.add_parser("start", help="subagent を起動する直前に")

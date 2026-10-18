@@ -35,7 +35,7 @@ python3 <skill>/scripts/check.py ledger ledger.md deck.html [ほかの成果物 
 # 3. 書き出しと描画の確認
 python3 <skill>/scripts/build.py deck.html --out out
 python3 <skill>/scripts/check.py pptx out/<名前>.pptx deck.html
-# 4. 検品 (review.md の手順。新しい reviewer、渡すのは 3 つの path だけ。起動は review_record.py を通す)
+# 4. 検品 (review.md の手順。新しい reviewer、渡すのは 3 つの path だけ。配布物があれば --extra で足す。起動は review_record.py を通す)
 python3 <skill>/scripts/review_record.py start review --round <n+1>   # または run (別プロセス)
 python3 <skill>/scripts/review_record.py finish review --round <n+1> --reviewer-id <id>
 python3 <skill>/scripts/check.py review-evidence review
@@ -69,12 +69,12 @@ python3 <skill>/scripts/check.py manifest out review
 | v3 | 10/19 09:05 | 3 枚目の割合 | 本人の指示 | c018… | out/deck.pptx (5be3…) | review-3: 合格 | 検品済み |
 ```
 
-状態は「作業中 / 検品済み / 検品済み・指摘が残っています / 未検品 / 納品済み」のどれか。
+状態は「作業中 / 検品済み / 検品済み・指摘が残っています / 未検品 / 納品済み」のどれか。セルの中に `|` を書く時は `\|` にする。足したら `python3 scripts/check.py versions versions.md` で、どの行も見出しと同じ列の数かを確かめる (列がずれると、どの版を検品したかが読めなくなる)。
 
 ## 5. 渡す時の決まり
 
 - 「検品済み」として渡せるのは、`check.py manifest out review` が通った時だけ (渡す file の sha256 が、検品した file の sha256 と一致する)。
-- 通らない (検品の後に直した・書き出し直した) なら、もう一度検品するか、「未検品」として渡す (file 名に `_未検品`)。
+- 通らない (検品の後に直した・書き出し直した) なら、もう一度検品するか、「未検品」として渡す (`build.py … --unreviewed` で書き出し、file 名と中身に「未検品」を入れる。`review.md` §どちらも使えない時)。
 - 渡す時の報告には、版の番号と検品の状態を書く: 「v3 をお渡しします。別の目で点検済みです (review-3)」。
 
 ## 6. 直しから口調を学ぶ

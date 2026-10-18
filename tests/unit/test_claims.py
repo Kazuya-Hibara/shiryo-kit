@@ -54,6 +54,29 @@ class Claims(unittest.TestCase):
     def test_kanji_numerals_converted(self):
         self.assertIn("8時間", kanji_numerals_to_digits("一日について八時間"))
 
+    # CC1-6: 1 行に日付が 2 つある時、2 つ目の日付で止まる・別の種類になる
+    def test_two_wareki_dates_in_one_line(self):
+        dates = [t.key for t in extract("令和8年4月1日から令和9年4月1日まで") if t.kind == "date"]
+        self.assertEqual(dates, [(2026, 4, 1), (2027, 4, 1)])
+
+    def test_heisei_and_reiwa_in_one_line(self):
+        dates = [t.key for t in extract("平成31年4月1日と令和元年5月1日") if t.kind == "date"]
+        self.assertEqual(dates, [(2019, 4, 1), (2019, 5, 1)])
+
+    def test_second_seireki_year_stays_a_date(self):
+        k = kinds("この制度は2019年4月1日に始まり、2020年4月1日に改正された、という長い文の中です")
+        self.assertEqual([r for kind, r in k if kind == "date"], ["2019年4月1日", "2020年4月1日"], k)
+        self.assertFalse(any(kind == "qty" and "年" in r for kind, r in k), k)
+
+    def test_year_only_twice(self):
+        k = kinds("2019年に始まり2020年に見直した")
+        self.assertEqual([r for kind, r in k if kind == "date"], ["2019年", "2020年"], k)
+
+    def test_kanji_wareki_date(self):
+        a = [t for t in extract("平成三十一年四月一日から") if t.kind == "date"]
+        self.assertEqual([t.key for t in a], [(2019, 4, 1)])
+        self.assertEqual([t.key for t in extract("令和元年十月一日") if t.kind == "date"], [(2019, 10, 1)])
+
 
 if __name__ == "__main__":
     unittest.main()

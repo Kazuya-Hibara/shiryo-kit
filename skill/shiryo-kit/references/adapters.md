@@ -21,6 +21,7 @@
 | 部品 | 状態 | できること | 条件・注意 |
 |---|---|---|---|
 | HTML → pptx (`scripts/build.py`) | **既定** | 本文がテキストボックス・表のまま直せる pptx と PDF。読み原稿をノートに入れる (形は `html-contract.md`) | Node.js 22+・Chrome・Python 3.10+ (python-pptx)。土台は consulting-pptx-skill (MIT、改変して同梱。著作権表示はリポジトリの NOTICE) |
+| 予備の書き出し (`scripts/build.py --engine python`、中身は `scripts/html_to_pptx_static.py`) | **Chrome が動かない時に自動** (`--engine auto` が既定) | Python (python-pptx) だけで、本文がテキストボックス・表のまま直せる pptx とノート。PDF は LibreOffice があれば pptx から作る | **描画の確認ができていない書き出し**。見た目はブラウザと同じにならない (縦の中央寄せ・飾り・SVG の図形は再現しない。図は中の文字だけ)。`out/manifest.json` に `export_mode: python-fallback` と記録され、利用者への報告に「描画の確認ができていない書き出しです」と書く (§2.2) |
 | Claude Slides / Claude Design | 任意 (本人が選んだ時だけ) | claude.ai 上のスライド編集画面に渡し、そこでクリックしてコメント・直接編集。PowerPoint・PDF・Google スライドに書き出し | **内容が claude.ai (Anthropic のサーバー) に保存される** — 使う前に本人にそう伝え、了承を得る。claude.ai にログインした Claude Code が要る (API キー接続・一部の企業設定では使えない)。受け取る形は 1 枚ずつの決まった HTML (1920×1080)。書き出した pptx が直せる形か・日本語の書体が保たれるかは **実地で確かめるまで未検証**。書き出しは画面操作 |
 | Codex Presentations (OpenAI 同梱) | **案内しない** | (動作は確認済み) | 中で使う部品の license が「内部の評価・試験目的のみ、商用・本番不可」。英語前提の文章規則で、頼んでいない AI 画像を足す。利用者に頼まれても、この skill では使わない理由を伝える |
 
@@ -31,11 +32,22 @@ Codex は、モデルが打つ command を「囲い」(sandbox。作業フォル
 1. 初めて書き出す前に、利用者に一度だけ伝える: 「PowerPoint と PDF にする部品 (Chrome) は、Codex の安全のための囲いの外で動かす必要があります。このあと Codex が実行してよいかを確かめる画面を出すので、許可してください」。
 2. その command を、囲いの外での実行として依頼する (Codex の承認の確認。公式の呼び名は sandbox escalation)。確認が出るのは、対話で使っていて、承認の設定が「必要な時に聞く」(`on-request`) の時。
 3. 利用者が許可したら実行する。毎回聞かれたくないと言われたら、確認の画面で今後も許可する方法 (Codex が提案する許可の範囲を受け入れると `~/.codex/rules/default.rules` に書かれる) を案内する。受け入れる前に、範囲がこの skill の script (`python3 <skill>/scripts/build.py` など) だけかを一緒に確かめる。
-4. 確認が出ない (`codex exec` などの非対話の実行、承認の設定が「聞かない」(`never`))、または利用者が断った時は、書き出さずに止まる。最後の報告に「**pptx はまだ作れていません**」と書き、理由と今ある物 (HTML のスライド。PDF も作れていなければ「PDF もまだです」) を伝える。利用者が自分の画面で実行できるなら、実行する command を 1 行で渡す。
+4. 確認が出ない (`codex exec` などの非対話の実行、承認の設定が「聞かない」(`never`))、または利用者が断った時は、囲いの中のまま `build.py` を実行する。Chrome が起動しないので、`build.py` が自分で予備の書き出しに切り替える (§2.2)。最後の報告に「**描画の確認ができていない書き出しです**」と書き、PDF が作れたか (LibreOffice も囲いの中では動かないことが多い) を伝える。囲いの外で実行できれば Chrome で書き出し直せることも 1 行添える (利用者が自分の画面で実行できるなら、その command を 1 行で渡す)。
+
+### 2.2 Chrome が動かない環境 (Claude のアプリ・ChatGPT の Work・Codex の囲いの中など)
+
+Claude のアプリ (Cowork・チャット) や ChatGPT の Work は、skill のフォルダを読み込んで Python を動かせるが、Chrome があるとは公式の説明に書かれていない (利用者テストはまだ)。`build.py` は既定 (`--engine auto`) で、Chrome が見つからない・起動しない時に、製品に同梱した予備の書き出し (Python だけ。`scripts/html_to_pptx_static.py`) へ自動で切り替え、切り替えた理由を表示する。
+
+- pptx: 本文はテキストボックス、表は PowerPoint の表、読み原稿はノートのまま。見た目はブラウザで描いた時と同じにならない。
+- PDF: LibreOffice があれば、予備の pptx から作る (まっさらな設定・時間の上限つきで起動する。上限は `SHIRYO_SOFFICE_TIMEOUT`、既定 180 秒)。無い・止まった時は PDF を作らず「PDF は作れませんでした」と表示する。作れていない PDF を作れたと言わない。
+- 記録: `out/manifest.json` の `export_mode` が `python-fallback`、`render_checked` が `false`、各 file の `mode` が `python-fallback` / `libreoffice`。
+- 機械チェック: `check.py pptx <pptx> deck.html` (Chrome が使えなければ、自分で静的な比較に切り替えて WARN を出す。`--static` は付けない — 検品の依頼文の雛形にも無い)。予備の書き出しで入れられなかった画像・図は `build.py` が「注意:」で枚の番号を出し、`check.py pptx` も WARN にする (図は中の文字だけになる。ロゴ・グラフが要るなら PowerPoint で貼り直す)。`check.py manifest` は記録にある予備の出力を通し (WARN で「描画の確認ができていない」と出る)、記録に無い pptx・pdf は今まで通り FAIL。
+- 報告: 「描画の確認ができていない書き出しです」と書き、PowerPoint で開いてはみ出し・重なりを目で確かめてもらう。検品 (P5) の結論はこの違いに関係なく別に書く (予備の書き出しでも、検品済みの deck から書き出したなら「検品済み」)。
 
 してはいけないこと:
-- その場で別の変換器 (python-pptx などで書いた即席の script) を作って、`build.py` の代わりにすること。`build.py` には日本語の空白・読み原稿・起動待ちの直しと描画の確認が入っていて、即席の物はそれを通らない。
+- その場で別の変換器 (python-pptx などで書いた即席の script) を作って、`build.py` の代わりにすること。Chrome が無い時の正しい道は `build.py` が自分で切り替える予備の書き出し (§2.2) で、即席の物は日本語の空白・読み原稿・表の伸びの直しを通らない。
 - `build.py` 以外で作った file を納品物にしたり、「検品済み」と呼んだりすること。`check.py manifest` が通るのは `build.py` が書いた記録だけで、それ以外は「未検品」。
+- 予備の書き出しの file を「描画を確かめた」と言うこと。
 
 Claude Slides / Design を使う時の追加の決まり:
 - 検品 (P5) は、渡す前の私たちの HTML と台帳で済ませておく。

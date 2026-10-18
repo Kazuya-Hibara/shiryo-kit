@@ -1,7 +1,7 @@
 """shiryo-kit: 確認が要る語（数字・日付・率・金額・法令名・条番号）を文章から拾い、比べられる形（正規形）にする。
 
 check.py ledger が使う。拾い方（references/html-contract.md「出典台帳の形式」と同じ説明）:
-  date   2026年4月1日 / 令和8年4月1日（西暦に直して比べる）/ 2026/4/1 / 4月1日 / 4月 / 2026年度 / 14:00
+  date   2026年4月1日 / 令和8年4月1日・平成三十一年四月一日（西暦に直して比べる）/ 2026/4/1 / 4月1日 / 4月 / 2026年度 / 14:00
   yen    1,163円 / 3.5万円 / 1億2,000万円（金額に直して比べる: 3.5万円 = 35,000円）
   pct    50% / 50％ / 50パーセント / 5割（= 50%）/ 2.5ポイント
   qty    数 + 単位（人・名・件・社・日・か月・年・時間・分・回・倍・歳・週・枚・台・本・個・点・等級・級 など）
@@ -59,12 +59,24 @@ def kanji_numerals_to_digits(text):
     return re.sub(KANJI_NUM, sub, text)
 
 
+def _kanji_wareki(m):
+    era, y, mo, d = m.groups()
+    out = era + (y if y == "元" else str(kanji_to_int(y))) + "年"
+    if mo:
+        out += f"{kanji_to_int(mo)}月"
+        if d:
+            out += f"{kanji_to_int(d)}日"
+    return out
+
+
 def normalize(text):
     t = unicodedata.normalize("NFKC", text or "")
     t = t.replace("〜", "~").replace("–", "-").replace("−", "-")
     # 第三十二条 → 第32条（条・項・号の番号だけ）
     t = re.sub(rf"第({KANJI_NUM})(?=(?:条|項|号))", lambda m: f"第{kanji_to_int(m.group(1))}", t)
     t = re.sub(rf"(?<=条の)({KANJI_NUM})", lambda m: str(kanji_to_int(m.group(1))), t)
+    # 平成三十一年四月一日 → 平成31年4月1日（和暦の後ろの年・月・日だけ）
+    t = re.sub(rf"(令和|平成|昭和)\s*(元|{KANJI_NUM})年(?:\s*({KANJI_NUM})月(?:\s*({KANJI_NUM})日)?)?", _kanji_wareki, t)
     # 範囲「10~20%」「3~5万円」は両側に単位を付けて 2 つの語にする
     t = re.sub(rf"({NUM})\s*~\s*(?=({NUM})\s*([万億千]?\s*(?:円|%|パーセント|割|{UNIT_RE})))",
                lambda m: m.group(1) + m.group(3).replace(" ", "") + "~", t)
@@ -138,8 +150,9 @@ def extract(text, kinds=None):
         for i in range(a, b):
             used[i] = True
 
-    for kind, rx in PATTERNS:
+    for pkind, rx in PATTERNS:
         for m in rx.finditer(t):
+            kind = pkind  # 1 行に日付が 2 つある時も、2 つ目を同じ種類として読む
             a, b = m.span()
             if a == b or not free(a, b):
                 continue

@@ -179,6 +179,35 @@ class Ledger(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("--sources が見つからない", out)
 
+    # --- CC1-6: 和暦の日付が 2 つある引用で止まらない・読み原稿の data-ledger="skip"
+    def test_quote_with_two_wareki_dates_does_not_stop(self):
+        q = "「この法律は、平成三十一年四月一日から施行する。ただし、第二条の規定は、令和二年四月一日から施行する。」"
+        r = row("L1", "取得させる決まりは2019年4月1日から", "確認済み", URL, "2026-10-19", q, "2019年4月1日施行", "p1")
+        code, out, err = run_ledger(r, "<h1>2019年4月1日から始まりました</h1><p>本文</p>")
+        self.assertNotIn("Traceback", err)
+        self.assertEqual(fails(out), [], out + err)
+        self.assertEqual(code, 0, out + err)
+
+    def test_two_dates_on_one_slide_line(self):
+        r = row("L1", "2019年4月1日に施行", "本人提供", where="p1") + row("L2", "2020年4月1日に中小企業へ", "本人提供", where="p1")
+        code, out, err = run_ledger(r, "<h1>2019年4月1日に始まり、2020年4月1日に中小企業にも広がりました</h1><p>本文</p>")
+        self.assertNotIn("Traceback", err)
+        self.assertEqual(fails(out), [], out + err)
+
+    def test_skip_marker_in_notes(self):
+        notes = ('<aside class="notes"><p data-ledger="skip">たとえば架空の会社で、10日付いた人が3日取ったとします。</p>'
+                 '<p>労働時間は1日8時間です。<span data-ledger="skip">（例: 9時から18時）</span></p></aside>')
+        code, out, _ = run_ledger(CONFIRMED, SLIDE + notes)
+        self.assertEqual(fails(out), [], out)
+        self.assertEqual(code, 0, out)
+
+    def test_notes_without_skip_still_checked(self):
+        notes = '<aside class="notes"><p data-ledger="skip">架空の例: 10日のうち3日</p><p>参加者は120人です。</p></aside>'
+        code, out, _ = run_ledger(CONFIRMED, SLIDE + notes)
+        f = fails(out)
+        self.assertTrue(any("読み原稿" in x and "120人" in x for x in f), out)
+        self.assertFalse(any("10日" in x or "3日" in x for x in f), out)
+
 
 if __name__ == "__main__":
     unittest.main()

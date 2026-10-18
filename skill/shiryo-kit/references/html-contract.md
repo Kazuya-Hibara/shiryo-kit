@@ -44,6 +44,10 @@ python3 scripts/new_deck.py --parts b01,b03,b06,b09,b10 --title "資料名" -o d
   - 読み原稿・配布資料: 同じ行 (同じ段落)。
 - 未確認の数字を作らない (`evidence.md`)。数字を書かずに「[要確認] 最新の率は協会けんぽの料率表で確かめる」のように書いてよい。
 
+### 出典の行 (`.src`) の日付
+
+出典の行に日付を書く時は、「制度の基準日」(どの日の制度で説明しているか) と「原典の確認日」(原典を開いて確かめた日) を言葉で書き分ける。例: `出典: 厚生労働省「…」https://… (原典の確認日 2026年10月18日)。※2026年11月20日 (セミナー当日) 時点の制度で説明しています。` 「◯月時点の情報」とだけ書かない (確認日と並ぶと矛盾に読まれる)。決まりの理由は `evidence.md` §6「紙面の出典の注記」。型の見本 (`assets/kata/*/sample.html`) も同じ書き方にしてある。
+
 ### 照合から外す部品
 
 `check.py ledger` は次の部分の数字を台帳と照らさない (ページ番号・日付の帯・出典行など、主張ではない所):
@@ -99,19 +103,25 @@ Markdown の表を 1 つ書く。見出し行に「主張」(または「資料�
 
 ```
 python3 scripts/build.py deck.html --out out [--formats pptx,pdf,notes] [--author "氏名"] [--notes notes.json] [--ledger ledger.md]
+                         [--engine auto|chrome|python] [--unreviewed]
+python3 scripts/build.py handout.html --out out --handout [--formats …]   # 配布物を同じ out/ と記録に足す（本体の後で）
 ```
 
 | 出力 (out/) | 中身 |
 |---|---|
 | `<名前>.pptx` | 本文はテキストボックス、表は PowerPoint の表、読み原稿はノート。文書のプロパティの作成者・最終更新者は空 (`--author` で指定) |
-| `<名前>.pdf` | Chrome の印刷。読み原稿は出ない |
+| `<名前>.pdf` | Chrome の印刷。読み原稿は出ない。予備の書き出しでは、LibreOffice があれば pptx から作る (無ければ作らない) |
 | `<名前>_読み原稿.md` | スライドごとの読み原稿 (字数と時間の目安の行は `<!-- ledger:skip -->`) |
 | `manifest.json` | 書き出しの記録 (§5.2) |
 
 - `--formats notes` だけなら Node.js・Chrome は要らない。
+- `--engine auto` (既定): Chrome が見つからない・起動しない時は、Python だけの予備の書き出し (`html_to_pptx_static.py`) に自動で切り替え、理由を表示する。予備の書き出しは描画の確認ができていない書き出し (`adapters.md` §2.2)。`--engine chrome` は Chrome だけ (動かなければ止まる)、`--engine python` は予備だけ。
+- PowerPoint・LibreOffice は Chrome より字幅を広く取るので、表の行が折り返して伸びることがある。`build.py` は表の行の高さを推定で先に取り、表の下の物 (出典の行など) を伸びた分だけ下げる (下の帯 = スライドの下 1 割から始まる物は動かさない)。下げきれない時は「注意:」を表示し、`check.py pptx` が FAIL にする。HTML の側でも、表の下に 1 行分の余白を残す。
+- `--unreviewed`: 別文脈の検品ができずに渡す時。file 名が `<名前>_未検品.*` になり、pptx は各スライドの右上の「未検品」の箱と文書のプロパティ (題名・キーワード・分類)、PDF は各ページの右上に「未検品」が入る。読み原稿は `<名前>_読み原稿_未検品.md`。印の無い写しは作らない (`review.md` §どちらも使えない時)。
+- `--handout`: 配布物 (配布 1 枚など) を本体の deck と同じ `out/` に書き出し、記録に「元の file」つきで足す。本体を先に書き出しておく。
 - `--notes notes.json`: `["1枚目", "", "3枚目"]` か `{"1": "…", "3": "…"}`。HTML のノートより優先。
-- 書き出したら必ず `python3 scripts/check.py pptx out/<名前>.pptx deck.html`。
-- Codex では、`build.py` と Chrome を使う `check.py pptx` を囲い (sandbox) の外で実行する。囲いの中では Chrome が起動しない。手順と、できない時の止まり方 (「pptx はまだ作れていません」) は `adapters.md` §2.1。`build.py` の代わりに即席の変換器を書かない。`build.py` 以外で作った file は `check.py manifest` を通らず、納品しない。
+- 書き出したら必ず `python3 scripts/check.py pptx out/<名前>.pptx deck.html` (Chrome が使えない時は `check.py pptx` が自分で静的な比較に切り替え、WARN で知らせる。`--static` は付けない)。
+- Codex では、`build.py` と Chrome を使う `check.py pptx` を囲い (sandbox) の外で実行する。囲いの中では Chrome が起動しない。手順と、許可が無い時 (予備の書き出しで渡し、「描画の確認ができていない書き出しです」と伝える) は `adapters.md` §2.1・§2.2。`build.py` の代わりに即席の変換器を書かない。`build.py` 以外で作った file は `check.py manifest` を通らず、納品しない。
 
 ## 4. 機械チェック (scripts/check.py)
 
@@ -121,10 +131,11 @@ python3 scripts/build.py deck.html --out out [--formats pptx,pdf,notes] [--autho
 |---|---|
 | `check.py deck deck.html [--strict] [--phrases FILE]` | 部品集の版面の規約、タイトルの有無 (表紙・章扉以外)、書きかけ (TODO・◯◯・「ここに…を入れる」)、避ける言い回し (`scripts/data/banned_phrases.txt`、本文と読み原稿)。WARN: 話題の名前だけのタイトル、タイトルの語尾の混在、受給・加入を約束する言い方。`--strict` は WARN も FAIL にする |
 | `check.py ledger ledger.md deck.html [ほかの成果物 …] [--sources DIR]` | §2。ほかの成果物 = `.html` (配布資料)・`.md`・`.txt`・`.docx`。旧形式 `ledger deck.html ledger.md` も読む |
-| `check.py pptx out/<名前>.pptx deck.html [--static] [--overflow warn]` | 枚数、Chrome で描いた文字と pptx の文字の一致 (欠落 = FAIL。文字が画像になった枚もここで落ちる)、HTML の表が PowerPoint の表か、ノートが読み原稿と同じか、文書のプロパティが python-pptx の既定値でないか、はみ出しの推定 (箱の高さ・幅・表の下端・スライドの外 = FAIL)。WARN: スライドの半分以上が画像。`--static` は Chrome を使わない (CSS で隠した文字を欠落と数えることがある) |
+| `check.py pptx out/<名前>.pptx deck.html [--static] [--overflow warn]` | 枚数、Chrome で描いた文字と pptx の文字の一致 (欠落 = FAIL。文字が画像になった枚もここで落ちる)、HTML の表が PowerPoint の表か、ノートが読み原稿と同じか、文書のプロパティが python-pptx の既定値でないか、はみ出しの推定 (箱の高さ・幅・表の下端・スライドの外 = FAIL)、表と下の物の重なり (行が折り返して伸びた時の推定を含む。PowerPoint・LibreOffice は表を下へ伸ばす = FAIL)。WARN: スライドの半分以上が画像。`--static` は Chrome を使わない (`<style>` の display:none・visibility:hidden は読むが、ほかの CSS で隠した文字を欠落と数えることがある) |
 | `check.py pii <フォルダか file> [--allow FILE]…` | 人名 (敬称・「氏名:」・よくある名字+名)・電話・メール・郵便番号・住所・マイナンバーらしい 12 桁・人名の近くの健康の語・会社名+様/御中。表示は一部を伏せる。対象フォルダ直下の `pii-allowlist.txt` も自動で読む。`.` で始まる名前の file・フォルダは、対象の内側にあれば読まない |
 | `check.py review-evidence review` | §5.1。揃わなければ `FAIL 未検品: <理由>` |
 | `check.py manifest out review` | §5.2。渡す file が検品した版から書き出したものか |
+| `check.py versions versions.md` | 版の記録の表で、どの行も見出しと同じ列の数か (FAIL)・状態が決まった語か (WARN)。形は `revision.md` §4 |
 
 ## 5. 検品の記録
 
@@ -154,7 +165,7 @@ python3 <skill>/scripts/review_record.py run review --round <n> --stdin review/r
 ```
 
 - `start` は `request-<n>.md` が無いと止まる。依頼文に `review.md` の雛形に無い行がある時も止まる (`<…>` を埋めた行だけを認める)。`run` も起動の前に同じことを確かめる。`review-<n>.md` が起動前からあっても止まる (前の結果を使い回さない)。同じ巡を起動し直す時は `--force`。
-- 渡す物は案件フォルダの `BRIEF.md`・`ledger.md`・`deck.html` の 3 つに決まっている (別の名前なら `--brief` `--ledger` `--deck`)。`start` の時点の sha256 を記録する。
+- 渡す物は案件フォルダの `BRIEF.md`・`ledger.md`・`deck.html` の 3 つに決まっている (別の名前なら `--brief` `--ledger` `--deck`)。配布物は `--extra <file>` (何度でも) で足し、依頼文に「配布物:」の行で書く。`start` の時点の sha256 を記録する。
 - subagent は終了コードを返さない。`--exit` を付けなければ `exit_status: null` と、その理由 (`exit_note`) を記録する。これは「返事が返り、結果の file がある = 正常終了」として扱う決まり。
 
 `independence-<n>.json` の項目 (schema `shiryo-kit/review-independence/v1`):
@@ -177,7 +188,7 @@ python3 <skill>/scripts/review_record.py run review --round <n> --stdin review/r
 - 記録がある・schema と round が合う・method が 2 つのどちらか・status が finished。
 - 起動 < 終了・未来の時刻でない。reviewer の識別子がある。reviewer の識別子が前の巡のどれとも違う (同じ reviewer に再検品を頼んでいない)。
 - 別プロセス: 終了コード 0・pid がある・実行記録の file があり空でなく sha256 が同じ。subagent: 終了コード 0 か null (理由つき)。Codex の subagent でない (`start` の時に Codex の囲いの印の環境変数があった、または識別子が `/root/` で始まる → FAIL。Codex の subagent は会話を引き継がない起動を示せないため)。
-- inputs がちょうど 3 つ・今の file の sha256 が記録と同じ (検品の後に直したら、その版は未検品)。
+- inputs がちょうど 3 つ・今の file の sha256 が記録と同じ (検品の後に直したら、その版は未検品)。配布物を `--extra` で渡した時は `extra_inputs` も同じ (今の file の sha256 が記録と同じで、依頼文にその file 名がある)。
 - 依頼文が起動の後に書き換えられていない。
 - 結果の file がある・sha256 が終了時点と同じ・更新時刻が起動〜終了 (+120 秒) の間・「結論: 合格」か「結論: 直しが必要」の行がある (雛形のままは FAIL)。
 - WARN: 起動から終了まで 20 秒未満、結果に deck の sha256 が無い、spec_rev の行が無い、依頼文に 3 つの file 名が無い、前の巡の記録の不備。
@@ -187,7 +198,7 @@ python3 <skill>/scripts/review_record.py run review --round <n> --stdin review/r
 ### 5.2 書き出しの記録 (out/manifest.json) と照合
 
 `build.py` が毎回 `out/manifest.json` を書く (schema `shiryo-kit/build-manifest/v1`):
-`built_at`・`formats`・`deck` / `ledger` / `brief` (`{path (out からの相対), sha256}`、無ければ null)・`outputs` (`[{file, format, sha256, bytes, deck_sha256, built_at}]`)。同じ deck から別々に書き出した file (pptx の後で pdf) の行は残す。台帳は `--ledger` か、deck.html の隣の `ledger.md`。
+`built_at`・`formats`・`deck` / `ledger` / `brief` (`{path (out からの相対), sha256}`、無ければ null)・`export_mode` (`chrome` / `python-fallback`)・`render_checked` (Chrome で描いたか)・`fallback_reason` (予備に切り替えた理由)・`unreviewed_mark` (`--unreviewed` の時)・`outputs` (`[{file, format, sha256, bytes, source, deck_sha256, mode, built_at}]`。`source` = 元の HTML (out からの相対)、`deck_sha256` = その HTML の sha256、`mode` = `chrome` / `python-fallback` / `libreoffice` / `text`)。元の file が変わっていない書き出しの行は残す (pptx の後で pdf、本体の後で配布物)。台帳は `--ledger` か、deck.html の隣の `ledger.md`。
 
 `check.py manifest out review` が FAIL にすること:
 - `manifest.json` が無い・読めない (→ `未検品`)。
@@ -195,8 +206,9 @@ python3 <skill>/scripts/review_record.py run review --round <n> --stdin review/r
 - review-evidence が通らない (→ `未検品: …`)。
 - 書き出した時の deck・台帳・BRIEF の sha256 が、最後の巡で検品した物と違う (→ `未検品: …`)。
 - `out/` に、記録に無い pptx・pdf がある (`build.py` 以外で作った物。即席の変換器の出力など)。
+- 配布物 (`source` が本体の deck でない行): 元の file が無い・書き出した後に変わった、または最後の巡の検品の `extra_inputs` に入っていない (→ `未検品: …`)。
 
-通った時は `OK manifest: 状態=検品済み` か、結論が「直しが必要」なら `状態=検品済み・指摘が残っています` (+ WARN)。`out/` にあって記録に無い md・docx・html は WARN (照合できないので渡さない)。
+通った時は `OK manifest: 状態=検品済み（…・書き出し=Chrome|予備（描画の確認なし）…）` か、結論が「直しが必要」なら `状態=検品済み・指摘が残っています` (+ WARN)。予備の書き出し (`export_mode: python-fallback`) は記録にあれば通り、WARN で「描画の確認ができていない書き出しです」と出る。`out/` にあって記録に無い md・docx・html は WARN (照合できないので渡さない)。
 
 ## 6. プレビュー (scripts/preview.py)
 
@@ -215,8 +227,9 @@ python3 scripts/preview.py <案件フォルダ> --port 9000 / --foreground (こ�
 |---|---|---|---|
 | Python 3.10 以上 | 全部 | 入っていなければ https://www.python.org/ | `winget install Python.Python.3.12` |
 | python-pptx・lxml | build (pptx)・check pptx | `python3 -m venv ~/.shiryo-kit-venv && ~/.shiryo-kit-venv/bin/pip install python-pptx lxml` (以後 `~/.shiryo-kit-venv/bin/python3` で実行) | `py -m pip install python-pptx lxml` |
-| Node.js 22 以上 | build (pptx・pdf)・check pptx (Chrome で描く時) | `brew install node` | `winget install OpenJS.NodeJS.LTS` (入れた後はターミナルを開き直す) |
+| LibreOffice (任意) | 予備の書き出しの PDF | 入っていれば自動で使う | 同左 |
+| Node.js 22 以上 | build (pptx・pdf)・check pptx (Chrome で描く時。無ければ予備の書き出し・静的な比較に切り替わる) | `brew install node` | `winget install OpenJS.NodeJS.LTS` (入れた後はターミナルを開き直す) |
 | Chrome (または Edge・Chromium・Brave) | 同上 | 通常の場所 (`/Applications`) にあれば自動で見つける | Edge は最初から入っている。自動で見つける |
 
-環境変数: `CHROME_PATH` (または `SHIRYO_CHROME_PATH`) = ブラウザの場所を指定。`SHIRYO_CHROME_WAIT_MS` = ブラウザの起動を待つ時間 (既定 45000)。足りない物があると、scripts は入れ方を表示して止まる。
+環境変数: `CHROME_PATH` (または `SHIRYO_CHROME_PATH`) = ブラウザの場所を指定。`SHIRYO_CHROME_WAIT_MS` = ブラウザの起動を待つ時間 (既定 45000)。`SHIRYO_SOFFICE_TIMEOUT` = LibreOffice の時間の上限 (秒、既定 180)。python-pptx が無いと build (pptx) と check pptx は入れ方を表示して止まる。Node.js・Chrome が無い時は止まらず、build は予備の書き出しに、check pptx は静的な比較に切り替わる (`adapters.md` §2.2)。
 deck / ledger / pii / review-evidence / manifest / preview / review_record は標準ライブラリだけで動く。
