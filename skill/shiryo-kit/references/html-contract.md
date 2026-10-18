@@ -176,7 +176,7 @@ python3 <skill>/scripts/review_record.py run review --round <n> --stdin review/r
 |---|---|
 | `schema` `recorder` `round` | 形の名前・書いた script・何巡目 |
 | `method` | `subagent` / `fresh-process` |
-| `status` | `started` → `finished` (失敗時 `failed` / `no-result` / `launch-failed`) |
+| `status` | `started` → `finished` (失敗時 `failed` / `no-result` / `launch-failed` / `no-start`。`no-start` = 最初の出力が来ないので止めた / `interrupted` = この script が外から止められ、reviewer も止めた。どちらも `exit_status` は null、`error` に理由) |
 | `started_at` `ended_at` | script が時計から取った時刻 (ISO 8601、ミリ秒、時差つき) |
 | `inputs` `inputs_sha256` | `{brief, ledger, deck}` の path (案件フォルダから) と sha256 |
 | `request_file` `request_sha256` | 依頼文と、その起動時点の sha256 |

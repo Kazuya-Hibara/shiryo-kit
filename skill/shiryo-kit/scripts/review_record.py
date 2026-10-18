@@ -29,12 +29,14 @@ import platform
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 SCHEMA = "shiryo-kit/review-independence/v1"
 RECORDER = "shiryo-kit/scripts/review_record.py"
 INPUT_NAMES = {"brief": "BRIEF.md", "ledger": "ledger.md", "deck": "deck.html"}
 TEMPLATE_DOC = Path(__file__).resolve().parent.parent / "references" / "review.md"
+FIRST_OUTPUT_DEFAULT = 180  # 秒。codex exec が 1 行も出さないまま待つ上限（V2: ChatGPT の Work で無言のまま止まった）
 CODEX_ENV_KEYS = ("CODEX_SANDBOX", "CODEX_SANDBOX_NETWORK_DISABLED", "CODEX_THREAD_ID")
 
 
@@ -269,6 +271,37 @@ def _session_id(run_file):
     return m.group(1) if m else None
 
 
+def is_codex_exec(cmd):
+    """codex exec --json の起動か（前に timeout・env・npx などが付いていても、Windows の codex.exe / codex.cmd でも）。
+    --json の無い codex exec は最後まで標準出力が空のことがあるので、最初の出力の見張りを既定では付けない。"""
+    words = [str(x) for x in cmd]
+    if "exec" not in words or "--json" not in words:
+        return False
+    names = (re.split(r"[\\/]", w)[-1] for w in words[:words.index("exec")])  # Windows の path も分ける
+    return any(Path(n).stem.lower() == "codex" for n in names)
+
+
+def _stop_tree(proc):
+    """reviewer と、その下の孫（ラッパーのシェル・node など）をまとめて止める（別のプロセスグループで起動してある）。"""
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True)
+    else:
+        import signal
+        try:
+            os.killpg(proc.pid, signal.SIGTERM)
+        except (ProcessLookupError, PermissionError):
+            pass
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            pass
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)  # 止まらなかった子と、残った孫
+        except (ProcessLookupError, PermissionError):
+            pass
+    proc.wait()
+
+
 def cmd_run(a):
     cmd = a.cmd
     if not cmd:
@@ -280,8 +313,15 @@ def cmd_run(a):
     rec["stdin_file"] = a.stdin and os.path.relpath(Path(a.stdin).resolve(), case_dir(a.review_dir))
     try:
         with open(ps["run"], "wb") as out, open(ps["stderr"], "wb") as err:
+            limit = a.first_output_timeout
+            if limit is None and is_codex_exec(cmd):
+                limit = FIRST_OUTPUT_DEFAULT  # codex exec --json は起動するとすぐ行を出す。何も出ないのは起動していない
+            group = {}
+            if limit:  # 止める時にラッパーの下の孫まで止められるよう、別のプロセスグループで起動する
+                group = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
+                         else {"start_new_session": True})
             try:
-                proc = subprocess.Popen(cmd, stdin=stdin, stdout=out, stderr=err, cwd=a.cwd or None)
+                proc = subprocess.Popen(cmd, stdin=stdin, stdout=out, stderr=err, cwd=a.cwd or None, **group)
             except OSError as e:
                 rec["status"] = "launch-failed"
                 rec["ended_at"] = now()
@@ -290,7 +330,33 @@ def cmd_run(a):
                 die(f"起動できない: {e}")
             rec["pid"] = proc.pid
             save(a.review_dir, a.round, rec)
-            code = proc.wait()
+            if group and os.name != "nt":
+                # 別のグループで起動したので、外の道具がこの script を止めても reviewer には届かない。止められたら一緒に止める
+                import signal
+
+                def _interrupted(signum, _frame):
+                    _stop_tree(proc)
+                    rec.update(status="interrupted", ended_at=now(), exit_status=None,
+                               error=f"review_record.py がシグナル {signum} で止められた（reviewer も止めた）")
+                    save(a.review_dir, a.round, rec)
+                    sys.exit(128 + signum)
+                for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+                    signal.signal(sig, _interrupted)
+            t0 = time.monotonic()
+            while True:
+                try:
+                    code = proc.wait(timeout=0.5)
+                    break
+                except subprocess.TimeoutExpired:
+                    pass
+                if limit and time.monotonic() - t0 > limit and ps["run"].stat().st_size == 0:
+                    _stop_tree(proc)
+                    rec.update(status="no-start", ended_at=now(), exit_status=None, run_file=ps["run"].name, run_bytes=0,
+                               reviewer_id=f"pid:{proc.pid}", error=f"{limit:g} 秒たっても reviewer の出力が 1 行も無い")
+                    save(a.review_dir, a.round, rec)
+                    die(f"reviewer のプロセスが {limit:g} 秒たっても何も出さないので止めました（この環境では別プロセスの検品が"
+                        f"起動しない。{ps['stderr']} も読む）。検品は「未検品」。review.md §どちらも使えない時の手順で書き出し直し、"
+                        "最後の報告に「手で頼む点検」の案内を入れる")
     finally:
         if a.stdin:
             stdin.close()
@@ -351,6 +417,9 @@ def main():
     inputs(p)
     p.add_argument("--stdin", help="標準入力に渡す file（依頼文 review/request-<n>.md）")
     p.add_argument("--cwd", help="起動する場所（既定: 今の場所）")
+    p.add_argument("--first-output-timeout", type=float, default=None,
+                   help=f"この秒数たっても標準出力が 1 行も無ければ止めて no-start と記録する（codex exec --json は既定 {FIRST_OUTPUT_DEFAULT} 秒。"
+                        "点検そのものの時間は区切らない。claude -p --output-format json は最後にしか出力しないので付けない）")
     p.set_defaults(fn=cmd_run)
     p = sub.add_parser("show")
     common(p)

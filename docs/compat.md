@@ -73,7 +73,7 @@ Codex を WSL (Windows の中の Linux) で動かす時は、WSL の中の家の
 | U-02 | 書き出した pptx を実際の PowerPoint (Windows・Mac) で開いて、崩れと直しやすさ | README と agent-setup.md の「PowerPoint で開いた時の崩れは…」の段落と、各行の検証状況 |
 | U-03 | ChatGPT のデスクトップアプリの Annotate と、Claude のデスクトップアプリの要素選択で、実際に直せるか | agent-setup.md の「直したい時」の「未検証」と、対応環境の表の「使えない・弱い機能」 |
 | U-04 | 初めての士業の方 (同じような立場の 2〜3 名) が、迷わず使えるか・信用できると感じるか | README 全体の書き方と、各行の検証状況 |
-| U-05 | Claude の Cowork と ChatGPT の Work に `shiryo-kit-skill.zip` を入れ、入口から成果物まで通るか (スキルが入るか・Chrome が動くか、動かない時の予備の書き出し・PDF・別の AI による点検・メモの引き継ぎ) | README の「おすすめの使い方」の「利用者テストはまだ」と「未確認」、対応環境の表の Cowork・Work の行 |
+| U-05 | Claude の Cowork と ChatGPT の Work に `shiryo-kit-skill.zip` を入れ、入口から成果物まで通るか (スキルが入るか・Chrome が動くか、動かない時の予備の書き出し・PDF・別の AI による点検・メモの引き継ぎ) | README の「おすすめの使い方」の最初の注記 (ブラウザ版で通した・デスクトップアプリは未確認) と、対応環境の表の Cowork・Work の行 |
 
 あわせて、利用者テストの前に作った側が確かめておくこと (README の「未検証」は外さない):
 
@@ -97,11 +97,19 @@ Codex を WSL (Windows の中の Linux) で動かす時は、WSL の中の家の
 | ChatGPT: 「Work」に切り替える | https://learn.chatgpt.com/docs/get-started-with-work —「First, switch to Work.」 |
 | ChatGPT: Work は無料を含む全プランに入っている | https://learn.chatgpt.com/docs/pricing —「ChatGPT Work and Codex are included in your ChatGPT Free, Go, Plus, Pro, Business, Edu, or Enterprise plan」。Free・Go は「GPT-6 Luna at Standard speed in the desktop app, subject to rollout」 |
 
+**実機で確かめたこと (2026-10-19、作った側、ブラウザ版の claude.ai と chatgpt.com。架空の依頼で 1 回ずつ):**
+
+- ChatGPT は、左端のアイコンの列から開く「カスタマイズ」→「スキル」→「追加」→「コンピューターからアップロード」で ZIP を入れられた (.zip・25 MB まで)。「プラグイン」の画面の「プラグインアーカイブをアップロード」とは別。ブラウザ版でも、入れたスキルを Work で使えた (「@shiryo」で選べる)。
+- Claude は「Customize」→「Skills」→「Add」→「Upload skill」で入れられ、Cowork の作業で使われた (右の欄の「Context」→「Skills」に表示)。Cowork の既定「Manual」では、コマンドごとに許可を求めて止まる。
+- どちらも Chrome があり、確認つきの書き出しになった。別の AI による点検は、Cowork ではできた。Work では `codex exec` が 45 秒の間に何も出さず (作り手の AI が自分で 45 秒に区切った)、未検品になった (原因は確かめていない)。
+- 入るスキルの名前は ZIP の中の SKILL.md から付いた (ZIP の名前ではない)。
+
 **確かめられなかったこと (README では「未確認」と書いた):**
 
-- ChatGPT で、自分のスキルを ZIP から追加する画面の手順と名前。公式のページ (learn.chatgpt.com) には、プラグインの作り方 (https://developers.openai.com/plugins/build/plugins の `plugin.json` と `skills/<名前>/SKILL.md`、手元の marketplace の JSON を置いてデスクトップアプリを再起動する) と、会話で作る「Plugin Creator」(https://learn.chatgpt.com/docs/build-plugins) しか書かれていない。ふつうの利用者が ZIP を入れる手順は help.openai.com にあるらしいが、開けなかった。
+- デスクトップアプリ (Claude.app・ChatGPT.app) の画面と名前。上の確認はブラウザ版だけ。
+- ChatGPT で ZIP からスキルを追加する手順の公式の説明 (画面はブラウザ版で確かめた。上)。公式のページ (learn.chatgpt.com) には、プラグインの作り方 (https://developers.openai.com/plugins/build/plugins の `plugin.json` と `skills/<名前>/SKILL.md`、手元の marketplace の JSON を置いてデスクトップアプリを再起動する) と、会話で作る「Plugin Creator」(https://learn.chatgpt.com/docs/build-plugins) しか書かれていない。ふつうの利用者が ZIP を入れる手順は help.openai.com にあるらしいが、開けなかった。
 - `install.sh --codex` で `~/.agents/skills` に入れたスキルが、ChatGPT のデスクトップアプリの Work からも見えるか (公式に書かれているのは Codex が読むことだけ)。
 - ChatGPT の無料・Go のプランで自分のスキルを入れられるか。Work で gpt-6-astra を選べるか。
-- Claude で、アップロードした自分のスキルが Cowork の作業の中でも使われるか (共有したスキルは「チャットとCoworkの両方で機能します」とあるが、自分で入れたスキルについての一文は無い)。
-- Cowork・Work の中に Chrome・LibreOffice・Node.js があるか (どの公式ページにも書かれていない)。無い時の予備の書き出しは shiryo-kit 側で用意した (README の「Cowork・Work の中で起こりうること」)。
+- Claude で、アップロードした自分のスキルが Cowork の作業の中でも使われるか: 公式に一文は無いが、2026-10-19 にブラウザ版で使われることを確かめた (上)。
+- Cowork・Work の中に Chrome・LibreOffice・Node.js があるか (どの公式ページにも書かれていない。2026-10-19 のブラウザ版では Chrome があった。いつもあるかは分からない)。無い時の予備の書き出しは shiryo-kit 側で用意した (README の「Cowork・Work の中で起こりうること」)。
 

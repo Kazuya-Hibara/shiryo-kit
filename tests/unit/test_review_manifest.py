@@ -27,7 +27,7 @@ def filled_request(n=1, extra=""):
 def reviewer_cmd(verdict="合格", deck_sha="", sleep=0.0, code=0, write=True):
     body = f"# 検品結果\\n## 結論: {verdict}\\n- deck.html sha256: {deck_sha}\\nspec_rev: 1\\n"
     return [sys.executable, "-c",
-            "import sys,json,time;sys.stdin.read();print(json.dumps({'type':'thread.started','thread_id':'t-1'}));"
+            "import sys,json,time;sys.stdin.read();print(json.dumps({'type':'thread.started','thread_id':'t-1'}),flush=True);"
             f"time.sleep({sleep});" + (f"open('review/review-1.md','w',encoding='utf-8').write('{body}');" if write else "")
             + f"sys.exit({code})"]
 
@@ -64,6 +64,80 @@ class ReviewEvidence(unittest.TestCase):
             code, out, _ = check("review-evidence", d / "review")
         self.assertEqual(code, 1)
         self.assertIn("未検品", out)
+
+    def test_silent_reviewer_is_stopped_and_unreviewed(self):
+        """V2 q3: ChatGPT の Work で codex exec が何も出さずに止まった。最初の出力が来なければ止め、no-start と記録して未検品にする。
+        遅くても出力が始まった reviewer は止めない（点検には数分かかる）。"""
+        with TempDir() as d:
+            c = Case(d)
+            silent = [sys.executable, "-c", "import time,sys;sys.stdin.read();time.sleep(30)"]
+            t0 = time.time()
+            code, out, err = c.rec("run", "review", "--round", "1", "--stdin", "review/request-1.md",
+                                   "--first-output-timeout", "2", "--", *silent)
+            self.assertLess(time.time() - t0, 20)
+            self.assertNotEqual(code, 0)
+            self.assertIn("未検品", err)
+            self.assertIn("手で頼む点検", err)
+            rec = json.loads((d / "review" / "independence-1.json").read_text(encoding="utf-8"))
+            self.assertEqual(rec["status"], "no-start")
+            self.assertEqual(c.evidence()[0], 1)
+        with TempDir() as d:
+            c = Case(d)
+            code, out, err = c.rec("run", "review", "--round", "1", "--stdin", "review/request-1.md",
+                                   "--first-output-timeout", "8", "--",
+                                   *reviewer_cmd(deck_sha=sha(d / "deck.html"), sleep=9))  # 出力が始まっていれば 8 秒を超えても止めない
+            self.assertEqual(code, 0, out + err)
+
+    @unittest.skipIf(sys.platform == "win32", "POSIX のシグナルで試す")
+    def test_stopping_the_recorder_stops_the_reviewer(self):
+        """外の道具が review_record.py を止めたら、別のグループの reviewer も止め、interrupted と記録する（F4 2b の点検 S9）。"""
+        import signal
+        import subprocess
+        with TempDir() as d:
+            c = Case(d)
+            (d / "late.py").write_text("import time;time.sleep(6);open('review/run-1.jsonl','a').write('late')", encoding="utf-8")
+            child = [sys.executable, "-c", "import subprocess,sys,time;subprocess.Popen([sys.executable,'late.py']);"
+                                           "sys.stdin.read();time.sleep(60)"]
+            p = subprocess.Popen([sys.executable, str(SCRIPTS / "review_record.py"), "run", "review", "--round", "1",
+                                  "--stdin", "review/request-1.md", "--first-output-timeout", "300", "--", *child], cwd=d)
+            time.sleep(2)
+            p.send_signal(signal.SIGTERM)
+            self.assertNotEqual(p.wait(timeout=20), 0)
+            rec = json.loads((d / "review" / "independence-1.json").read_text(encoding="utf-8"))
+            self.assertEqual(rec["status"], "interrupted")
+            time.sleep(6)
+            self.assertEqual((d / "review" / "run-1.jsonl").read_bytes(), b"")
+            self.assertEqual(c.evidence()[0], 1)
+
+    def test_codex_exec_detection(self):
+        """最初の出力の見張りの既定は codex exec --json だけ（timeout・npx が前に付いても、Windows の名前でも）。"""
+        from review_record import is_codex_exec
+        yes = [["codex", "exec", "--json", "-"], ["timeout", "-k", "3s", "45s", "/opt/codex/bin/codex", "exec", "--json", "-"],
+               ["codex.exe", "exec", "--json"], ["C:\\npm\\codex.cmd", "exec", "--json"], ["npx", "-y", "@openai/codex", "exec", "--json"],
+               ["env", "A=1", "codex", "exec", "--json"]]
+        no = [["codex", "exec", "-"], ["claude", "-p", "--output-format", "json"], ["python3", "x.py", "exec", "--json"],
+              ["codex", "--json"]]
+        for c in yes:
+            self.assertTrue(is_codex_exec(c), c)
+        for c in no:
+            self.assertFalse(is_codex_exec(c), c)
+
+    @unittest.skipIf(sys.platform == "win32", "POSIX のシグナルで試す")
+    def test_silent_wrapper_and_grandchild_are_stopped(self):
+        """SIGTERM を無視するラッパーと、その下の孫も止める（止めた後に孫が記録を書き足さない）。"""
+        with TempDir() as d:
+            c = Case(d)
+            (d / "late.py").write_text("import time;time.sleep(9);open('review/run-1.jsonl','a').write('late')", encoding="utf-8")
+            wrapper = [sys.executable, "-c",
+                       "import signal,subprocess,sys,time;signal.signal(signal.SIGTERM,signal.SIG_IGN);"
+                       f"subprocess.Popen([sys.executable,'late.py']);sys.stdin.read();time.sleep(60)"]
+            t0 = time.time()
+            code, out, err = c.rec("run", "review", "--round", "1", "--stdin", "review/request-1.md",
+                                   "--first-output-timeout", "1", "--", *wrapper)
+            self.assertNotEqual(code, 0)
+            self.assertLess(time.time() - t0, 30)
+            time.sleep(max(0.0, 11 - (time.time() - t0)))  # 孫が生きていれば 9 秒で書く（SIGTERM の無視は孫に受け継がれる）
+            self.assertEqual((d / "review" / "run-1.jsonl").read_bytes(), b"")
 
     def test_fresh_process_record_passes(self):
         with TempDir() as d:
