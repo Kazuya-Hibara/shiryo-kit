@@ -21,6 +21,7 @@ python3 scripts/new_deck.py --list                                   # 部品の
 python3 scripts/new_deck.py --parts b01,b03,b06,b09,b10 --title "資料名" -o deck.html
 ```
 
+- `new_deck.py` と `build.py` は、作り始める前に案件フォルダの `BRIEF.md` を読み、最後に見せた要約への本人の承認 (条件の付かないもの) が無ければ何も作らずに止まる (関門 1。形は `brief-template.md`、止まった時の文にすることが書いてある)。BRIEF が別の場所なら `--brief <path>`。
 - 出来た HTML は見本の文字 (「Text 1」「ラベル 1」など) が入っている。全部書き換える (残ると `check.py deck` が FAIL)。
 - 各枚に空の `<aside class="notes"></aside>` が入っている。読み原稿をここに書く。
 
@@ -135,6 +136,7 @@ python3 scripts/build.py handout.html --out out --handout [--formats …]   # �
 | `check.py pii <フォルダか file> [--allow FILE]…` | 人名 (敬称・「氏名:」・よくある名字+名)・電話・メール・郵便番号・住所・マイナンバーらしい 12 桁・人名の近くの健康の語・会社名+様/御中。表示は一部を伏せる。対象フォルダ直下の `pii-allowlist.txt` も自動で読む。`.` で始まる名前の file・フォルダは、対象の内側にあれば読まない |
 | `check.py review-evidence review` | §5.1。揃わなければ `FAIL 未検品: <理由>` |
 | `check.py manifest out review` | §5.2。渡す file が検品した版から書き出したものか |
+| `check.py approval BRIEF.md` | 関門 1。「## 要約の提示」の最後の版に、承認記録の本人の言葉が条件なしで答えているか (`build.py`・`new_deck.py` が止まる条件と同じ) |
 | `check.py versions versions.md` | 版の記録の表で、どの行も見出しと同じ列の数か (FAIL)・状態が決まった語か (WARN)。形は `revision.md` §4 |
 
 ## 5. 検品の記録

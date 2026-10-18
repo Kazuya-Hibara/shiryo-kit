@@ -17,10 +17,13 @@ new_deck.py — 2つのパーツ集から必要なパーツだけを取り出し
 ページ番号（フッター）は並び順で振り直す。表紙（b01）・章扉（b04）・裏表紙（b10）は番号を振らない。
 
   --list   パーツ番号と型名の一覧を表示して終了
+  --brief  BRIEF.md の path（省略時は出力先と同じフォルダの BRIEF.md）。承認の記録が無ければ作らない（関門 1）
 """
 import argparse, pathlib, re, sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "scripts"))
+from approval import gate as approval_gate  # noqa: E402
 BASE = ROOT / "assets" / "parts" / "freeform_parts_16x9.html"
 MORE = ROOT / "assets" / "parts" / "freeform_parts_more_16x9.html"
 
@@ -129,6 +132,7 @@ def main():
     ap.add_argument("--title", default="資料名")
     ap.add_argument("-o", "--out", default="mydeck.html")
     ap.add_argument("--list", action="store_true")
+    ap.add_argument("--brief", help="BRIEF.md の path（省略時は出力先と同じフォルダの BRIEF.md）")
     a = ap.parse_args()
 
     base_html, more_html = read(BASE), read(MORE)
@@ -142,6 +146,12 @@ def main():
         for i, nm in enumerate(part_names(more_html, "slide"), 1):
             print(f"m{i:02d}  {nm}")
         return
+
+    # 関門 1: 本人が最後に見た要約に承認が無ければ、デッキを作り始めない
+    stop = approval_gate(pathlib.Path(a.brief) if a.brief else pathlib.Path(a.out).resolve().parent / "BRIEF.md")
+    if stop:
+        print(stop, file=sys.stderr)
+        sys.exit(2)
 
     picked = []
     for tok in a.parts.split(","):

@@ -2,7 +2,7 @@
 import json
 import unittest
 
-from _helpers import TempDir, deck_html, run
+from _helpers import TempDir, deck_html, run, write_approved_brief
 from deck_html import parse_deck
 
 
@@ -18,6 +18,7 @@ class Notes(unittest.TestCase):
 
     def test_notes_markdown_and_json_override(self):
         with TempDir() as d:
+            write_approved_brief(d)  # 関門 1 を通る BRIEF（書き出しの試験）
             (d / "deck.html").write_text(deck_html('<h1>結論です</h1><p>本文</p><aside class="notes"><p>HTML の原稿</p></aside>',
                                                    '<h1>次です</h1><p>本文</p>'), encoding="utf-8")
             code, out, err = run("build.py", "deck.html", "--out", "out", "--formats", "notes", cwd=d)

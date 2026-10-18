@@ -10,13 +10,14 @@
   python3 check.py review-evidence review/            # 別の文脈で検品した記録が揃っているか（揃わなければ「未検品」）
   python3 check.py manifest out/ review/              # 渡す file が、検品した版から書き出したものか（sha256 で照合）
   python3 check.py versions versions.md               # 版の記録の表の形（どの行も見出しと同じ列の数・状態の語）
+  python3 check.py approval BRIEF.md                  # 関門 1: 最後に見せた要約に、条件の付かない本人の承認があるか（build.py も同じ判定で止まる）
   ledger に --sources sources/ を付けると、確認済みの引用を保存した原典の本文と照らす（省略時は台帳の隣の sources/）
 
 行の頭: FAIL = 直す / WARN = 目で確かめる（WARN だけなら exit 0）/ OK = 合格の要約。
   deck   に --strict を付けると WARN も不合格にする。
   pptx   は Chrome で HTML を描いて「描かれた文字」と pptx の文字を比べる（--static は Chrome を使わず HTML を静的に読む）。
          はみ出しは推定（字数 × 字の大きさ ÷ 箱の幅）。--overflow warn で WARN に下げる。
-依存: deck / ledger / pii / review-evidence / manifest / versions = 標準ライブラリだけ。pptx = python-pptx・lxml（+ 既定では Node.js 22 以上と Chrome）。
+依存: deck / ledger / pii / review-evidence / manifest / versions / approval = 標準ライブラリだけ。pptx = python-pptx・lxml（+ 既定では Node.js 22 以上と Chrome）。
 """
 import math
 import re
@@ -532,6 +533,13 @@ def main():
         return cmd_manifest(args[0], args[1])
     if cmd == "versions" and args:
         return cmd_versions(args[0])
+    if cmd == "approval" and args:
+        from approval import message, problems
+        probs, last = problems(args[0])
+        if probs:
+            steps = message(probs, last, args[0]).split("すること:", 1)[1].strip()
+            return emit([t for _, t in probs] + [f"関門 1。すること: {steps}"], [])
+        return emit([], [], [f"approval: 要約 rev {last} への本人の承認あり"])
     print(__doc__)
     return 2
 

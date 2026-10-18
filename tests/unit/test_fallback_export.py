@@ -3,7 +3,8 @@ import json
 import shutil
 import unittest
 
-from _helpers import FIXTURES, HAS_CHROME, HAS_PPTX, ROOT, SCRIPTS, TRAPS, TempDir, check, fails, run, warns
+from _helpers import (FIXTURES, HAS_CHROME, HAS_PPTX, ROOT, SCRIPTS, TRAPS, TempDir, check, fails, run, warns,
+                      write_approved_brief)
 
 CLAIMS = FIXTURES / "claims_deck.html"  # e2e CC2 の claims の deck（架空の事務所・架空の連絡先だけ）
 KATA = SCRIPTS.parent / "assets" / "kata"
@@ -116,6 +117,7 @@ class TableOverlap(unittest.TestCase):
 class ClaimsRegression(unittest.TestCase):
     def test_claims_deck_builds_without_table_overlap(self):
         with TempDir() as d:
+            write_approved_brief(d)  # 関門 1 を通る BRIEF（書き出しの試験）
             shutil.copy(CLAIMS, d / "deck.html")
             code, out, err = run("build.py", "deck.html", "--out", "out", "--formats", "pptx", "--engine", "chrome", cwd=d)
             self.assertEqual(code, 0, out + err)
@@ -154,6 +156,7 @@ class Fallback(unittest.TestCase):
 
     def test_build_records_fallback_mode(self):
         with TempDir() as d:
+            write_approved_brief(d)  # 関門 1 を通る BRIEF（書き出しの試験）
             shutil.copy(CLAIMS, d / "deck.html")
             code, out, err = run("build.py", "deck.html", "--out", "out", "--formats", "pptx,notes", "--engine", "python", cwd=d)
             self.assertEqual(code, 0, out + err)
@@ -167,6 +170,7 @@ class Fallback(unittest.TestCase):
     def test_auto_falls_back_without_node(self):
         import os
         with TempDir() as d:
+            write_approved_brief(d)  # 関門 1 を通る BRIEF（書き出しの試験）
             shutil.copy(TRAPS / "deck.html", d / "deck.html")
             env = {"PATH": os.pathsep.join(p for p in os.environ.get("PATH", "").split(os.pathsep)
                                            if not (shutil.which("node", path=p)))}
@@ -177,9 +181,52 @@ class Fallback(unittest.TestCase):
             self.assertEqual(m["export_mode"], "python-fallback")
             self.assertIn("Node.js", m.get("fallback_reason", ""))
 
+    def test_fallback_tells_how_to_redo_with_chrome(self):
+        """RX-8: 予備の書き出しの時、利用者への報告に入れる「Chrome で書き出し直せる」の 1 行を必ず出す（Codex なら囲いの外）。"""
+        with TempDir() as d:
+            shutil.copy(TRAPS / "deck.html", d / "deck.html")
+            write_approved_brief(d)
+            code, out, err = run("build.py", "deck.html", "--out", "out", "--formats", "notes,pptx", "--engine", "python",
+                                 env={"CODEX_SANDBOX": "seatbelt"}, cwd=d)
+            self.assertEqual(code, 0, out + err)
+            self.assertIn("利用者への報告に必ず書く", out)
+            self.assertIn("囲いの外で実行してよければ", out)
+            code, out, err = run("build.py", "deck.html", "--out", "out2", "--formats", "pptx", "--engine", "python", cwd=d)
+            self.assertIn("利用者への報告に必ず書く", out)
+            self.assertNotIn("囲いの外", out)
+            self.assertIn("Chrome が使える", out)
+
+    def test_redo_command_keeps_handout_and_record(self):
+        """作り直しの command が --handout・--formats を引き継ぎ、実行しても本体の deck の記録を書き換えない（F4 2a の点検 M2）。"""
+        import shlex
+        import subprocess
+        with TempDir() as d:
+            case = d / "案件 A"
+            case.mkdir()
+            shutil.copy(TRAPS / "deck.html", case / "deck.html")
+            write_approved_brief(case)
+            (case / "handout.html").write_text(
+                "<html><body><section class='s'><h1>配布 1 枚</h1><p>手順は3つ</p></section></body></html>", encoding="utf-8")
+            self.assertEqual(run("build.py", "deck.html", "--out", "out", "--formats", "notes", cwd=case)[0], 0)
+            code, out, err = run("build.py", "handout.html", "--out", "out", "--formats", "pptx", "--engine", "python",
+                                 "--handout", cwd=case)
+            self.assertEqual(code, 0, out + err)
+            line = next(x for x in out.splitlines() if x.startswith("利用者への報告に必ず書く"))
+            cmd = line.split("作り直す command: ", 1)[1]
+            self.assertIn("--handout", cmd)
+            self.assertIn("--formats pptx", cmd)
+            argv = shlex.split(cmd)
+            argv[0] = sys.executable
+            r = subprocess.run(argv + ["--engine", "python"], cwd=case, capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            m = json.loads((case / "out" / "manifest.json").read_text(encoding="utf-8"))
+            self.assertTrue(m["deck"]["path"].endswith("deck.html") and "handout" not in m["deck"]["path"], m["deck"])
+            self.assertFalse((case / "out" / "handout.pdf").exists())
+
     @unittest.skipUnless(HAS_SOFFICE, "LibreOffice が要る")
     def test_fallback_pdf_via_libreoffice_and_timeout(self):
         with TempDir() as d:
+            write_approved_brief(d)  # 関門 1 を通る BRIEF（書き出しの試験）
             shutil.copy(TRAPS / "deck.html", d / "deck.html")
             code, out, err = run("build.py", "deck.html", "--out", "out", "--formats", "pdf", "--engine", "python", cwd=d)
             self.assertEqual(code, 0, out + err)
@@ -198,6 +245,7 @@ class Unreviewed(unittest.TestCase):
     def test_mark_is_inside_the_file_and_no_unmarked_copy(self):
         from pptx import Presentation
         with TempDir() as d:
+            write_approved_brief(d)  # 関門 1 を通る BRIEF（書き出しの試験）
             shutil.copy(TRAPS / "deck.html", d / "deck.html")
             code, out, err = run("build.py", "deck.html", "--out", "out", "--formats", "pptx,notes", "--engine", "python",
                                  "--unreviewed", cwd=d)
@@ -275,6 +323,7 @@ class ReviewFixes(unittest.TestCase):
         from pptx import Presentation
         from pptx_metrics import table_growth
         with TempDir() as d:
+            write_approved_brief(d)  # 関門 1 を通る BRIEF（書き出しの試験）
             (d / "deck.html").write_text(ROWSPAN, encoding="utf-8")
             code, out, err = run("build.py", "deck.html", "--out", "out", "--formats", "pptx", "--engine", "python", cwd=d)
             self.assertEqual(code, 0, out + err)
@@ -289,6 +338,7 @@ class ReviewFixes(unittest.TestCase):
 
     def test_notes_only_build_is_text_mode(self):
         with TempDir() as d:
+            write_approved_brief(d)  # 関門 1 を通る BRIEF（書き出しの試験）
             shutil.copy(TRAPS / "deck.html", d / "deck.html")
             self.assertEqual(run("build.py", "deck.html", "--out", "out", "--formats", "notes", cwd=d)[0], 0)
             m = json.loads((d / "out" / "manifest.json").read_text(encoding="utf-8"))
@@ -296,6 +346,7 @@ class ReviewFixes(unittest.TestCase):
 
     def test_dropped_image_is_reported(self):
         with TempDir() as d:
+            write_approved_brief(d)  # 関門 1 を通る BRIEF（書き出しの試験）
             (d / "deck.html").write_text("<html><body><section class='s'><h1>ロゴ</h1><img src='data:image/png;base64,AAAA'>"
                                          "<svg><text>図の字</text></svg></section></body></html>", encoding="utf-8")
             code, out, err = run("build.py", "deck.html", "--out", "out", "--formats", "pptx", "--engine", "python", cwd=d)

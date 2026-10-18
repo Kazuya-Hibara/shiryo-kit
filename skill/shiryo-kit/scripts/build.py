@@ -37,6 +37,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -45,11 +46,13 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from _deps import BrowserUnavailable, find_chrome, require_node  # noqa: E402
+from approval import gate as approval_gate  # noqa: E402
 from deck_html import parse_deck  # noqa: E402
 
 FORMATS = ("pptx", "pdf", "notes")
 ENGINES = ("auto", "chrome", "python")
 UNREVIEWED = "未検品"
+CODEX_SANDBOX_KEYS = ("CODEX_SANDBOX", "CODEX_SANDBOX_NETWORK_DISABLED")  # Codex が囲いの中の command に付ける印
 FALLBACK_NOTE = ("描画の確認ができていない書き出しです（Chrome が使えないため、予備の書き出しで作りました。"
                  "PowerPoint で開いて、はみ出し・重なりを目で確かめてください）")
 CHARS_PER_MIN = 300  # 読み上げの目安（日本語 1 分 300 字前後）
@@ -242,11 +245,17 @@ def main():
     ap.add_argument("--engine", default="auto", choices=ENGINES, help="auto（既定）/ chrome / python（予備の書き出し）")
     ap.add_argument("--handout", action="store_true", help="配布物として書き出す（記録の元の deck は変えず、配布物の行を足す）")
     ap.add_argument("--unreviewed", action="store_true", help="未検品で渡す: file 名と中身に「未検品」の印を入れる")
+    ap.add_argument("--brief", help="BRIEF.md の path（省略時は deck.html の隣の BRIEF.md）。承認の記録が無ければ書き出さない")
     a = ap.parse_args()
 
     html = Path(a.deck)
     if not html.exists():
         sys.exit(f"HTML が見つかりません: {html}")
+    brief = Path(a.brief) if a.brief else html.resolve().parent / "BRIEF.md"
+    stop = approval_gate(brief)  # 関門 1: 本人が最後に見た要約に承認が無ければ、何も書き出さずに止まる
+    if stop:
+        print(stop, file=sys.stderr)
+        sys.exit(2)
     fmts = [f.strip().lower() for f in a.formats.split(",") if f.strip()]
     bad = [f for f in fmts if f not in FORMATS]
     if bad or not fmts:
@@ -337,7 +346,7 @@ def main():
                             "Chrome のある環境で書き出し直してください")
     info = {"engine": engine, "fallback_reason": reason if engine == "python" else None,
             "unreviewed_mark": a.unreviewed or None}
-    mpath, m = write_manifest(out_dir, html, ledger, html.resolve().parent / "BRIEF.md", produced, fmts,
+    mpath, m = write_manifest(out_dir, html, ledger, brief, produced, fmts,
                               handout=a.handout, info=info)
     done.append(f"書き出しの記録: {mpath}（書き出しの方法: {m['export_mode']}）")
     for d in done:
@@ -346,6 +355,18 @@ def main():
         print(f"注意: {FALLBACK_NOTE}")
         if reason:
             print(f"  予備に切り替えた理由: {reason}")
+        args = ["python3", HERE / "build.py", html, "--out", out_dir, "--formats", a.formats]
+        for flag, val in (("--brief", a.brief), ("--ledger", a.ledger), ("--notes", a.notes), ("--author", a.author or None)):
+            if val:
+                args += [flag, val]
+        args += [f for f, on in (("--handout", a.handout), ("--unreviewed", a.unreviewed)) if on]
+        redo = " ".join(shlex.quote(str(x)) for x in args)  # 元の指定をそのまま引き継ぐ（配布物・別の BRIEF も）
+        if any(k in os.environ for k in CODEX_SANDBOX_KEYS):
+            print("利用者への報告に必ず書く: 「Codex の安全のための囲いの外で実行してよければ、Chrome で描画を確かめた書き出しに"
+                  f"作り直せます」。作り直す時は、次の command を囲いの外での実行として依頼する: {redo}")
+        else:
+            print("利用者への報告に必ず書く: 「Chrome が使える所 (Claude Code・Codex をパソコンで動かす時など) で書き出し直すと、"
+                  f"描画を確かめた書き出しにできます」。作り直す command: {redo}")
     if any(f == "pptx" for f, _, _ in produced):
         # Chrome が使えなければ check.py pptx が自分で静的な比較に切り替える（--static は付けなくてよい）
         print(f"次: python3 {HERE / 'check.py'} pptx {pptx_path} {html}")

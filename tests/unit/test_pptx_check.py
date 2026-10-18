@@ -4,7 +4,7 @@ import struct
 import unittest
 import zlib
 
-from _helpers import FIXTURES, HAS_CHROME, HAS_PPTX, TempDir, check, deck_html, fails, run, warns
+from _helpers import FIXTURES, HAS_CHROME, HAS_PPTX, TempDir, check, deck_html, fails, run, warns, write_approved_brief
 
 S1 = "<h1>就業規則は年1回見直します</h1><p>改正のたびに一行足すだけで防げます</p>"
 S1_NOTES = S1 + '<aside class="notes"><p>今日の結論です。</p></aside>'
@@ -147,6 +147,7 @@ class BuiltPptx(unittest.TestCase):
         cls.d = cls.td.__enter__()
         cls.html = cls.d / "deck.html"
         cls.html.write_bytes((FIXTURES / "sample_deck.html").read_bytes())
+        write_approved_brief(cls.d)  # 関門 1 を通る BRIEF
         cls.code, cls.out, cls.err = run("build.py", cls.html, "--out", cls.d / "out")
 
     @classmethod
@@ -199,6 +200,7 @@ class ZoomedParts(unittest.TestCase):
 
     def test_more_parts_build_and_check(self):
         with TempDir() as d:
+            write_approved_brief(d)  # 関門 1 を通る BRIEF（書き出しの試験）
             code, out, err = run("new_deck.py", "--parts", "m01,m12,m21,m35,b06", "--title", "試験", "-o", d / "m.html")
             self.assertEqual(code, 0, err)
             code, out, err = run("build.py", d / "m.html", "--out", d / "out", "--formats", "pptx")

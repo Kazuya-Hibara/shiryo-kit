@@ -68,3 +68,24 @@ class TempDir:
 
     def __exit__(self, *exc):
         self._td.cleanup()
+
+
+APPROVED_BRIEF = """---
+spec_rev: 1
+status: 承認済み
+案件: 試験用
+---
+
+# BRIEF — 試験用
+
+## 要約の提示
+- 2026-10-19 09:00 要約 rev 1 を見せた
+
+## 承認記録
+- 2026-10-19 09:05 本人「この内容で。」 (要約 rev 1 への返事。spec_rev 1) ※試験用に作った記録
+"""
+
+
+def write_approved_brief(folder):
+    """関門 1 を通る最小の BRIEF.md（書き出し・部品からの作成を試す試験用）。"""
+    (Path(folder) / "BRIEF.md").write_text(APPROVED_BRIEF, encoding="utf-8")
