@@ -7,11 +7,13 @@
   python3 build.py deck.html --formats notes                  # 読み原稿（Markdown）だけ（Node・Chrome 不要）
   python3 build.py deck.html --author "山田 花子"              # pptx の作成者欄（省略時は空）
   python3 build.py deck.html --notes notes.json               # HTML のノートの代わりに JSON を使う
+  python3 build.py deck.html --ledger ledger.md               # 書き出しの記録に入れる台帳（省略時は deck.html の隣の ledger.md）
 
 出力（--out 省略時は deck.html と同じフォルダ）:
   <名前>.pptx           編集できる PowerPoint（本文はテキストボックス・表は PowerPoint の表・ノート付き）
   <名前>.pdf            Chrome の印刷で作る PDF（読み原稿は印刷しない）
   <名前>_読み原稿.md     スライドごとの読み原稿
+  manifest.json         書き出しの記録（元の deck.html・ledger.md・BRIEF.md と、書き出した file の sha256。check.py manifest が読む）
 
 notes.json の形: ["1枚目のノート", "", "3枚目…"] か {"1": "…", "3": "…"}（キーはスライド番号）。
 依存: pptx = Python の python-pptx・lxml + Node.js 22 以上 + Chrome（または Edge / Chromium）。pdf = Node.js + Chrome。
@@ -19,7 +21,10 @@ notes.json の形: ["1枚目のノート", "", "3枚目…"] か {"1": "…", "3
 環境変数: SHIRYO_CHROME_WAIT_MS（ブラウザ起動の待ち時間、既定 45000）、CHROME_PATH（ブラウザの場所を指定）。
 """
 import argparse
+import datetime
+import hashlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -68,6 +73,46 @@ def notes_markdown(deck, notes):
     return "\n".join(lines).rstrip() + "\n"
 
 
+MANIFEST_SCHEMA = "shiryo-kit/build-manifest/v1"
+
+
+def sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def write_manifest(out_dir, html, ledger, brief, produced, fmts):
+    """out/manifest.json。同じ deck.html から前に書き出した file の行は残す（pptx と pdf を別々に作った時）。"""
+    mpath = out_dir / "manifest.json"
+    deck_sha = sha256(html)
+    old = {}
+    if mpath.exists():
+        try:
+            old = json.loads(mpath.read_text(encoding="utf-8"))
+        except ValueError:
+            old = {}
+    now = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+    outputs = {o["file"]: o for o in old.get("outputs", []) if isinstance(o, dict) and o.get("deck_sha256") == deck_sha
+               and (out_dir / o.get("file", "")).exists()}
+    for fmt, p in produced:
+        outputs[p.name] = {"file": p.name, "format": fmt, "sha256": sha256(p), "bytes": p.stat().st_size,
+                           "deck_sha256": deck_sha, "built_at": now}
+
+    def src(p):
+        if p is None or not p.exists():
+            return None
+        return {"path": os.path.relpath(p.resolve(), out_dir.resolve()), "sha256": sha256(p)}
+
+    m = {"schema": MANIFEST_SCHEMA, "built_at": now, "formats": fmts,
+         "deck": src(html), "ledger": src(ledger), "brief": src(brief),
+         "outputs": sorted(outputs.values(), key=lambda o: o["file"])}
+    mpath.write_text(json.dumps(m, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return mpath
+
+
 def build_pdf(html, out_pdf):
     node = require_node()
     r = subprocess.run([node, str(HERE / "html_pdf.mjs"), str(Path(html).resolve()), str(out_pdf)],
@@ -83,6 +128,7 @@ def main():
     ap.add_argument("--formats", default="pptx,pdf,notes", help="pptx,pdf,notes から必要なものをカンマ区切りで")
     ap.add_argument("--author", default="", help="pptx の作成者・最終更新者（省略時は空）")
     ap.add_argument("--notes", help="ノートを JSON で渡す（HTML のノートより優先）")
+    ap.add_argument("--ledger", help="書き出しの記録に入れる出典台帳（省略時は deck.html の隣の ledger.md）")
     a = ap.parse_args()
 
     html = Path(a.deck)
@@ -101,20 +147,28 @@ def main():
         sys.exit("スライドが見つかりません。1 枚ごとに <section class=\"s\"> … </section> で囲んでください（references/html-contract.md）。")
     notes = load_notes_json(a.notes, len(deck.slides)) if a.notes else [s.notes for s in deck.slides]
 
-    done = []
+    ledger = Path(a.ledger) if a.ledger else html.resolve().parent / "ledger.md"
+    if a.ledger and not ledger.exists():
+        sys.exit(f"--ledger の file が見つかりません: {ledger}")
+    done, produced = [], []
     if "notes" in fmts:
         p = out_dir / f"{stem}_読み原稿.md"
         p.write_text(notes_markdown(deck, notes), encoding="utf-8")
+        produced.append(("notes", p))
         done.append(f"読み原稿: {p}（ノートあり {sum(1 for t in notes if t.strip())}/{len(deck.slides)} 枚）")
     if "pptx" in fmts:
         from html_to_pptx import convert  # python-pptx が無ければここで入れ方を表示して止まる
         p = out_dir / f"{stem}.pptx"
         n, n_notes = convert(str(html), str(p), notes=notes, author=a.author)
+        produced.append(("pptx", p))
         done.append(f"pptx: {p}（{n} 枚・ノート {n_notes} 枚）")
     if "pdf" in fmts:
         p = out_dir / f"{stem}.pdf"
         build_pdf(html, p)
+        produced.append(("pdf", p))
         done.append(f"pdf: {p}")
+    mpath = write_manifest(out_dir, html, ledger, html.resolve().parent / "BRIEF.md", produced, fmts)
+    done.append(f"書き出しの記録: {mpath}")
     for d in done:
         print(d)
     if "pptx" in fmts:

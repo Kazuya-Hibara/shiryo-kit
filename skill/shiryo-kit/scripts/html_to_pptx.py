@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 Carnot AI Inc. (MIT) — derived from carnot-tech/consulting-pptx-skill scripts/html_to_pptx.py
 # Modifications for shiryo-kit (MIT): speaker notes from the HTML (aside.notes / data-notes), neutral document
-# properties (author / lastModifiedBy empty or --author), actionable dependency errors. Normally called via build.py.
+# properties (author / lastModifiedBy empty or --author), actionable dependency errors, text boxes widened for
+# list-style bullets drawn outside the text. Normally called via build.py.
 """HTMLデッキ（16:9・1 section = 1スライド）を、編集できる PPTX に変換する。
 
 使い方（ふだんは build.py から呼ばれる）:
@@ -185,6 +186,11 @@ def add_text(slide, it, sc):
     # 複数行も PowerPoint の字幅差で行末の1字（句点など）が次行に落ちないよう、わずかに広げる
     w = it["w"] * (1.04 if single else 1.015) + 2
     x = it["x"]
+    # ブラウザの行頭記号（list-style）は文字の箱の外の左に描かれる（hang = 0）。PowerPoint では記号のぶら下げ（1 字分、
+    # fill_runs）が箱の内側に入るので、その分だけ箱を左に広げる（広げないと本文の幅が 1 字分足りずにはみ出す）
+    ext = max((p["runs"][0]["size"] for p in it["paras"] if p.get("bullet") and not p.get("hang") and p["runs"]), default=0)
+    x -= ext
+    w += ext
     align = it["paras"][0].get("align", "left") if it["paras"] else "left"
     if single and align in ("center",):
         x -= (w - it["w"]) / 2

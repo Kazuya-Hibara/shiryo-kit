@@ -8,8 +8,11 @@ check.py ledger が使う。台帳の形式は references/html-contract.md「出
   - スライドと読み原稿の数字・日付・率・金額・法令名・条番号は、どれかの行の 主張 か 表記 に同じ値で載っていること
   - 未確認の行にだけ当たる語は、同じ文章塊（スライド）・同じ行（読み原稿・配布資料）に [要確認] を出すこと
   - 照合する file: HTML デッキ（本文とノート）・読み原稿 .md・配布資料 .md/.txt/.docx など、渡したもの全部
+  - 確認済みの引用は、保存した原典の本文（台帳の隣の sources/、または --sources）に同じ文字列が有ること
 """
+import html as html_lib
 import re
+import unicodedata
 from dataclasses import dataclass, field
 
 from claims import extract, kanji_numerals_to_digits
@@ -18,16 +21,20 @@ STATUS = {"確認済み": "確認済み", "確認済": "確認済み", "原典�
           "未確認": "未確認", "要確認": "未確認", "本人提供": "本人提供", "本人": "本人提供", "提供": "本人提供"}
 COLS = {
     "id": ("ID", "id", "番号", "No", "No."),
-    "claim": ("主張", "内容", "主張・数字"),
+    "claim": ("主張", "内容", "主張・数字", "資料での書き方"),
     "forms": ("表記", "資料での表記", "表記ゆれ"),
     "status": ("区分", "状態", "ステータス"),
     "url": ("出典URL", "出典 URL", "URL", "出典"),
     "date": ("取得日", "確認日", "取得・確認日"),
-    "quote": ("引用", "原文", "該当箇所", "引用（原文）"),
+    "quote": ("引用", "原文", "該当箇所", "引用（原文）", "引用(原文)", "取得した本文の該当箇所(引用)",
+              "取得した本文の該当箇所（引用）", "取得した本文の該当箇所"),
     "applies": ("適用時点", "時点", "施行日・適用時点", "適用"),
     "where": ("使用箇所", "場所", "ページ", "使用場所"),
     "memo": ("備考", "メモ"),
+    "fetched": ("取得", "取得成否", "取得できたか"),
+    "kind": ("種類", "種別"),
 }
+FETCH_FAILED = re.compile(r"失敗|できなかった|不可|404|403|リンク切れ|タイムアウト|×")
 EMPTY = {"", "-", "—", "ー", "なし", "無し", "未", "n/a", "N/A", "TBD", "未取得"}
 MARK = re.compile(r"[\[［【]\s*要確認\s*[\]］】]")
 DATE_RX = re.compile(r"\d{4}\s*[-/年.]\s*\d{1,2}(?:\s*[-/月.]\s*\d{1,2})?|(?:令和|平成)\s*\d+\s*年")
@@ -104,7 +111,7 @@ def parse_ledger(text):
 def parse_pages(s):
     pages = set()
     s = s.replace("〜", "-").replace("～", "-").replace("–", "-")
-    for a, b in re.findall(r"(?:p|P|P\.|p\.|スライド|ｐ)\s*(\d+)(?:\s*-\s*(?:p|P|P\.|p\.)?\s*(\d+))?", s):
+    for a, b in re.findall(r"(?:(?<![A-Za-z])(?:[pPsS]\.?)|スライド|ｐ)\s*(\d+)(?:\s*-\s*(?:[pPsS]\.?)?\s*(\d+))?", s):
         lo, hi = int(a), int(b or a)
         pages.update(range(lo, hi + 1))
     for a in re.findall(r"(\d+)\s*枚目", s):
@@ -136,6 +143,8 @@ def validate_rows(rows):
             out.append(f"台帳 {r.rid}: 確認済みなのに引用（原典の該当箇所の文）が無い（モデルの記憶だけで確認済みにしない）")
         if r.get("applies") in EMPTY:
             out.append(f"台帳 {r.rid}: 確認済みなのに適用時点（施行日・経過措置・対象）が無い")
+        if FETCH_FAILED.search(r.get("fetched")):
+            out.append(f"台帳 {r.rid}: 取得が「{r.get('fetched')}」なのに確認済み（取得できなかったものは 未確認）")
         if r.get("quote") not in EMPTY:
             src = kanji_numerals_to_digits(r.get("quote") + "\n" + r.get("applies"))
             src_tokens = extract(src)
@@ -143,6 +152,56 @@ def validate_rows(rows):
             for t in claim_tokens:
                 if not any(t.matches(s) for s in src_tokens):
                     out.append(f"台帳 {r.rid}: 主張の「{t.raw}」が引用・適用時点に見当たらない（原典と食い違う数字か、引用が足りない）")
+    return out
+
+
+SOURCE_SUFFIXES = {".txt", ".md", ".markdown", ".html", ".htm", ".text"}
+
+
+def _norm_quote(s):
+    s = unicodedata.normalize("NFKC", s)
+    s = s.replace("〜", "~").replace("～", "~").replace("―", "-").replace("‐", "-")
+    return re.sub(r"\s+", "", s)
+
+
+def _source_text(path):
+    t = path.read_text(encoding="utf-8", errors="ignore")
+    if path.suffix.lower() in (".html", ".htm"):
+        t = re.sub(r"(?is)<(script|style)\b.*?</\1>", " ", t)
+        t = html_lib.unescape(re.sub(r"<[^>]+>", " ", t))
+    return t
+
+
+def load_sources(paths):
+    """sources/（または指定した file・フォルダ）から原典の本文を読む。[(path, 正規化した本文)]。PDF は .txt に直した物を置く。"""
+    out = []
+    for p in paths:
+        files = [p] if p.is_file() else sorted(f for f in p.rglob("*") if f.is_file())
+        for f in files:
+            if f.suffix.lower() in SOURCE_SUFFIXES:
+                out.append((f, _norm_quote(_source_text(f))))
+    return out
+
+
+def quote_fragments(quote):
+    """引用欄の「…」の中身（無ければ欄全体）。短すぎる断片（8 字未満）は照合しない。"""
+    frags = re.findall(r"[「『]([^「」『』]+)[」』]", quote)
+    if not frags:
+        frags = [re.sub(r"^[\"'“”]+|[\"'“”]+$", "", quote.strip())]
+    return [f for f in frags if len(_norm_quote(f)) >= 8]
+
+
+def verify_quotes(rows, sources):
+    """確認済みの行の引用が、保存した原典の本文に同じ文字列で有るか（空白・全角半角の違いは詰めて比べる）。"""
+    out = []
+    for r in rows:
+        if r.status != "確認済み" or r.get("quote") in EMPTY:
+            continue
+        for frag in quote_fragments(r.get("quote")):
+            nf = _norm_quote(frag)
+            if not any(nf in text for _, text in sources):
+                out.append(f"台帳 {r.rid}: 引用「{frag[:40]}」が保存した原典の本文（sources/）に見つからない"
+                           f"（写し間違いか、原典と違う。原典を取り直して照らす）")
     return out
 
 

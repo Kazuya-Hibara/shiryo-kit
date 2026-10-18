@@ -44,6 +44,16 @@ const collect = (TEXT_ONLY) => {
   let capId = 0;
   const captures = [];
 
+  // CSS の zoom（追加パーツ集の .slide{zoom:0.8} など）: 位置と大きさ（getBoundingClientRect）は縮むが、
+  // getComputedStyle の px（文字の大きさ・行間・余白・枠線）は縮まない。描かれる大きさ = 値 × 実効 zoom にそろえる
+  const Z = (el) => {
+    if (!el) return 1;
+    if (typeof el.currentCSSZoom === "number") return el.currentCSSZoom;
+    let z = 1;
+    for (let a = el; a; a = a.parentElement) { const v = parseFloat(getComputedStyle(a).zoom); if (v > 0) z *= v; }
+    return z;
+  };
+  const px = (el, v) => (parseFloat(v) || 0) * Z(el);
   // clip-path: polygon(...) を要素の左上基準の px 座標列に
   const polygonOf = (el, r) => {
     const cp = getComputedStyle(el).clipPath || "";
@@ -52,8 +62,8 @@ const collect = (TEXT_ONLY) => {
     const len = (expr, basis) => {
       let e = expr.trim().replace(/^calc/, "");
       e = e.replace(/(-?[\d.]+)%/g, (_, v) => `(${(parseFloat(v) / 100) * basis})`)
-        .replace(/(-?[\d.]+)mm/g, (_, v) => `(${parseFloat(v) * MM})`)
-        .replace(/(-?[\d.]+)px/g, (_, v) => `(${v})`);
+        .replace(/(-?[\d.]+)mm/g, (_, v) => `(${parseFloat(v) * MM * Z(el)})`)
+        .replace(/(-?[\d.]+)px/g, (_, v) => `(${parseFloat(v) * Z(el)})`);
       if (!/^[\d.\s()+\-*/]+$/.test(e)) return null;
       try { return Function(`return (${e})`)(); } catch { return null; }
     };
@@ -71,7 +81,7 @@ const collect = (TEXT_ONLY) => {
     const st = getComputedStyle(el);
     const c = rgba(st.color);
     return {
-      size: parseFloat(st.fontSize),
+      size: px(el, st.fontSize),
       bold: parseInt(st.fontWeight, 10) >= 600,
       italic: st.fontStyle === "italic",
       underline: (st.textDecorationLine || "").includes("underline"),
@@ -123,17 +133,17 @@ const collect = (TEXT_ONLY) => {
     const m = (pb.content || "").match(/^"(.*)"$/);
     if (m && m[1].trim()) {
       const c = rgba(pb.color);
-      return { char: m[1].trim(), color: c ? c.hex : null, size: parseFloat(pb.fontSize) };
+      return { char: m[1].trim(), color: c ? c.hex : null, size: px(li, pb.fontSize) };
     }
     if (getComputedStyle(li).display !== "list-item") return null;
     const lst = getComputedStyle(li).listStyleType;
     if (!lst || lst === "none") return null;
     if (lst === "decimal") return { auto: "arabicPeriod", start: [...li.parentElement.children].indexOf(li) + 1 };
-    return { char: "•", color: null, size: parseFloat(getComputedStyle(li).fontSize) };
+    return { char: "•", color: null, size: px(li, getComputedStyle(li).fontSize) };
   };
   const hangOf = (el) => {
     const pb = getComputedStyle(el, "::before");
-    const left = parseFloat(pb.left);
+    const left = px(el, pb.left);
     if (pb.position === "absolute" && left < 0) return -left;
     return 0;
   };
@@ -144,7 +154,7 @@ const collect = (TEXT_ONLY) => {
     const rootSt = getComputedStyle(root);
     const newPara = (el) => {
       const st = getComputedStyle(el);
-      cur = { align: st.textAlign, lineHeight: parseFloat(st.lineHeight) || parseFloat(st.fontSize) * 1.5, runs: [] };
+      cur = { align: st.textAlign, lineHeight: px(el, st.lineHeight) || px(el, st.fontSize) * 1.5, runs: [] };
       paras.push(cur);
     };
     const walk = (node, block) => {
@@ -197,8 +207,8 @@ const collect = (TEXT_ONLY) => {
   const ownText = (el) => [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
   const textDeep = (el) => (el.textContent || "").trim().length > 0;
 
-  const borders = (st) => ["Top", "Right", "Bottom", "Left"].map((s) => {
-    const w = parseFloat(st[`border${s}Width`]);
+  const borders = (st, z = 1) => ["Top", "Right", "Bottom", "Left"].map((s) => {
+    const w = parseFloat(st[`border${s}Width`]) * z;
     const style = st[`border${s}Style`];
     const c = rgba(st[`border${s}Color`]);
     return w > 0 && style !== "none" && style !== "hidden" && c && c.a > 0.05 ? { w, color: c.hex, dash: style === "dashed" || style === "dotted" ? style : null } : null;
@@ -253,8 +263,8 @@ const collect = (TEXT_ONLY) => {
             const fill = f && f.a > 0.05 ? f : (rowBg && rowBg.a > 0.05 ? rowBg : null);
             cells.push({
               r: ri, c: ci, rs, cs, rect: rel(cr), fill: fill ? fill.hex : null,
-              borders: borders(cst), valign: cst.verticalAlign, vert: [cell, ...cell.querySelectorAll("*")].some((d) => /^vertical/.test(getComputedStyle(d).writingMode)),
-              pad: ["Top", "Right", "Bottom", "Left"].map((k) => parseFloat(cst[`padding${k}`]) || 0),
+              borders: borders(cst, Z(cell)), valign: cst.verticalAlign, vert: [cell, ...cell.querySelectorAll("*")].some((d) => /^vertical/.test(getComputedStyle(d).writingMode)),
+              pad: ["Top", "Right", "Bottom", "Left"].map((k) => px(cell, cst[`padding${k}`])),
               paras: [...cell.querySelectorAll("*")].some(isGraphic) ? (graphicCells.push(cell), []) : paragraphsOf(cell),
             });
             ci += cs;
@@ -276,15 +286,15 @@ const collect = (TEXT_ONLY) => {
       // 塗り・枠・多角形（ルートのスライド自体の地色は背景として別扱い）
       if (!isRoot) {
         const f = rgba(st.backgroundColor);
-        const b = borders(st);
+        const b = borders(st, Z(el));
         const poly = polygonOf(el, r);
         const rr = st.borderTopLeftRadius || "0";
         const ellipse = /%/.test(rr) && parseFloat(rr) >= 50; // 50% の角丸＝楕円（正方形なら円）
-        const radius = /%/.test(rr) ? (parseFloat(rr) / 100) * Math.min(r.width, r.height) : (parseFloat(rr) || 0);
+        const radius = /%/.test(rr) ? (parseFloat(rr) / 100) * Math.min(r.width, r.height) : px(el, rr);
         const hasFill = f && f.a > 0.05;
         // 幅・高さ0で枠線だけの要素＝CSSの三角形。色のある辺から多角形を作る
         if (el.clientWidth === 0 && el.clientHeight === 0 && b.filter(Boolean).length === 1) {
-          const [bt, br, bb, bl] = ["Top", "Right", "Bottom", "Left"].map((k) => parseFloat(st[`border${k}Width`]) || 0);
+          const [bt, br, bb, bl] = ["Top", "Right", "Bottom", "Left"].map((k) => px(el, st[`border${k}Width`]));
           const W = r.width, H = r.height, k = b.findIndex(Boolean);
           const tri = [[[0, 0], [W, 0], [bl, bt]], [[W, 0], [W, H], [bl, bt]], [[0, H], [W, H], [bl, bt]], [[0, 0], [0, H], [bl, bt]]][k];
           items.push({ t: "rect", ...rel(r), fill: b[k].color, alpha: 1, poly: tri, radius: 0, line: null });
@@ -313,7 +323,7 @@ const collect = (TEXT_ONLY) => {
         const tr = textBox([el]) || el.getBoundingClientRect();
         const lines = tr.lines || 1;
         const cs = getComputedStyle(el);
-        const padL = parseFloat(cs.paddingLeft) + parseFloat(cs.borderLeftWidth), padR = parseFloat(cs.paddingRight) + parseFloat(cs.borderRightWidth);
+        const padL = px(el, cs.paddingLeft) + px(el, cs.borderLeftWidth), padR = px(el, cs.paddingRight) + px(el, cs.borderRightWidth);
         const content = { left: r.left + padL, width: r.width - padL - padR };
         const paras = paragraphsOf(el);
         const hang = paras[0]?.hang || 0;
@@ -352,7 +362,7 @@ const collect = (TEXT_ONLY) => {
         if (inline) g.push(n); else { if (g.length) groups.push(g); g = []; }
       }
       if (g.length) groups.push(g);
-      const padL = parseFloat(cs.paddingLeft) + parseFloat(cs.borderLeftWidth), padR = parseFloat(cs.paddingRight) + parseFloat(cs.borderRightWidth);
+      const padL = px(el, cs.paddingLeft) + px(el, cs.borderLeftWidth), padR = px(el, cs.paddingRight) + px(el, cs.borderRightWidth);
       const er = el.getBoundingClientRect();
       groups.forEach((grp, gi) => {
         if (!grp.some((n) => (n.textContent || "").trim())) return;
@@ -360,7 +370,7 @@ const collect = (TEXT_ONLY) => {
         if (!tr) return;
         const lines = tr.lines;
         const mk = gi === 0 ? marker(el) : null;
-        const mkPara = () => ({ align: cs.textAlign, lineHeight: parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.5, runs: [], hang: 0 });
+        const mkPara = () => ({ align: cs.textAlign, lineHeight: px(el, cs.lineHeight) || px(el, cs.fontSize) * 1.5, runs: [], hang: 0 });
         const paras = [mkPara()];
         if (mk) { paras[0].bullet = mk; paras[0].hang = hangOf(el); }
         const add = (node) => {

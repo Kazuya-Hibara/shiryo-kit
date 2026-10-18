@@ -30,11 +30,13 @@ def read(p):
 
 
 def split_css(html):
-    """先頭のHTMLコメント内に「<style>」の文字列があるので、コメント終了（-->）以降の実タグを探す。"""
-    start = html.find("-->")
-    i = html.index("<style>", start if start >= 0 else 0) + len("<style>")
-    j = html.index("</style>", i)
-    return html[i:j]
+    """最初の実際の <style> の中身。HTML コメントの中に「<style>」の文字があっても取り違えないよう、コメントを全部外してから探す
+    （コメントが複数あると、最初の --> の後ろもまだ別のコメントの中のことがある）。"""
+    body = re.sub(r"<!--.*?-->", "", html, flags=re.S)
+    m = re.search(r"<style\b[^>]*>(.*?)</style>", body, flags=re.S | re.I)
+    if not m:
+        sys.exit("パーツ集に <style> が見つかりません")
+    return m.group(1)
 
 
 def sections(html, cls):

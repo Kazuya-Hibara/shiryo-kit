@@ -7,12 +7,15 @@
                                                      #（旧形式 ledger deck.html ledger.md も可）
   python3 check.py pii    資料メモ/ [--allow 許可リスト.txt]   # メモリーに個人情報が残っていないか
   python3 check.py pptx   deck.pptx deck.html [--static] [--overflow warn]   # 書き出した pptx の読み戻し検査
+  python3 check.py review-evidence review/            # 別の文脈で検品した記録が揃っているか（揃わなければ「未検品」）
+  python3 check.py manifest out/ review/              # 渡す file が、検品した版から書き出したものか（sha256 で照合）
+  ledger に --sources sources/ を付けると、確認済みの引用を保存した原典の本文と照らす（省略時は台帳の隣の sources/）
 
 行の頭: FAIL = 直す / WARN = 目で確かめる（WARN だけなら exit 0）/ OK = 合格の要約。
   deck   に --strict を付けると WARN も不合格にする。
   pptx   は Chrome で HTML を描いて「描かれた文字」と pptx の文字を比べる（--static は Chrome を使わず HTML を静的に読む）。
          はみ出しは推定（字数 × 字の大きさ ÷ 箱の幅）。--overflow warn で WARN に下げる。
-依存: deck / ledger / pii = 標準ライブラリだけ。pptx = python-pptx・lxml（+ 既定では Node.js 22 以上と Chrome）。
+依存: deck / ledger / pii / review-evidence / manifest = 標準ライブラリだけ。pptx = python-pptx・lxml（+ 既定では Node.js 22 以上と Chrome）。
 """
 import math
 import re
@@ -29,6 +32,14 @@ from deck_html import parse_deck  # noqa: E402
 
 PLACEHOLDER = re.compile(r"(?i)\b(?:TODO|TBD|FIXME|XXX+)\b|lorem\s+ipsum|[◯○●]{2,}|△△|□□|×××|ここに[^。]{0,12}(?:入れ|書|入力|記入)|"
                          r"\?\?\?|？？？|＿{3,}|_{3,}|【(?:要記入|仮|ダミー|TBD)】|\{\{[^}]*\}\}")
+
+
+# 流用元の規約のうち、この skill の判断の軸（references/doctrine.md）と合わないもの
+UPSTREAM_DROP = ("タイトルがですます調",)            # です・ます のタイトルは可（そろえるかは下の混在チェックで見る）
+UPSTREAM_TO_WARN = ("1つの文章塊に2文以上",)         # 配る資料・読む資料では 2 文の塊もある（文字量の規制はしない）
+POLITE_END = re.compile(r"(?:です|ます|でした|ました|ません|でしょう|ましょう|ください)[。．.!！?？]?$")
+TOPIC_TITLE = re.compile(r"(?:の概要|概要|の現状|現状|について|とは|の背景|背景|一覧|まとめ|のポイント|ポイント|の流れ|の仕組み)[。]?$")
+TOC_TITLE = re.compile(r"^(?:目次|アジェンダ|本日の内容|本日の流れ|付録|参考資料|Appendix)", re.I)
 
 
 def emit(fails, warns, oks=()):
@@ -71,7 +82,10 @@ def cmd_deck(path, strict=False, phrases_file=None):
     cd.PART_TYPE_NAMES = cd._part_type_names()
     titles = cd.check_html(path, html)
     cd.check_title_variety(titles)
-    fails += cd.fails
+    for f in cd.fails:
+        if any(k in f for k in UPSTREAM_DROP):
+            continue
+        (warns if any(k in f for k in UPSTREAM_TO_WARN) else fails).append(f)
     warns += [w for w in cd.warns if "タイトルが空" not in w]
     # 2) タイトル: 表紙・章扉（.cover / .chap）以外は必須
     for s in deck.slides:
@@ -81,13 +95,23 @@ def cmd_deck(path, strict=False, phrases_file=None):
     for s in deck.slides:
         for m in PLACEHOLDER.finditer(s.text):
             fails.append(f"p{s.index} 本文: 書きかけ・プレースホルダーが残っている「{m.group(0)}」")
-    # 4) 避ける言い回し（data/banned_phrases.txt。スライド本文だけ）
+    # 2b) タイトルの形: 名詞だけ（話題の名前）・です/ます と言い切りの混在（references/doctrine.md §3・§5）
+    body = [s for s in deck.slides if s.title and not s.is_cover and not TOC_TITLE.search(s.title)]
+    for s in body:
+        if TOPIC_TITLE.search(s.title) and len(s.title) <= 16:
+            warns.append(f"p{s.index}: タイトルが話題の名前だけに見える「{s.title}」（結論を 1 文で: 「だから何か」を書く）")
+    polite = [s.index for s in body if POLITE_END.search(s.title)]
+    plain = [s.index for s in body if not POLITE_END.search(s.title)]
+    if polite and plain:
+        warns.append(f"タイトルの語尾が混在: です・ます p{polite} / 言い切り p{plain}（資料の中でどちらかにそろえる）")
+    # 4) 避ける言い回し（data/banned_phrases.txt。スライド本文と読み原稿）
     ph = load_phrases(phrases_file or HERE / "data" / "banned_phrases.txt")
     for s in deck.slides:
-        for lvl, bucket in (("fail", fails), ("warn", warns)):
-            hits = sorted({m.group(0) for rx in ph[lvl] for m in rx.finditer(s.text)})
-            if hits:
-                bucket.append(f"p{s.index} 本文: 避ける言い回し「{'」「'.join(hits[:5])}」（素直な言い方に直す）")
+        for where, text in (("本文", s.text), ("読み原稿", s.notes)):
+            for lvl, bucket in (("fail", fails), ("warn", warns)):
+                hits = sorted({m.group(0) for rx in ph[lvl] for m in rx.finditer(text)})
+                if hits:
+                    bucket.append(f"p{s.index} {where}: 避ける言い回し「{'」「'.join(hits[:5])}」（素直な言い方に直す）")
     # 5) 読み原稿の抜け（一部のスライドにだけある時）
     with_notes = [s.index for s in deck.slides if s.notes.strip()]
     if with_notes:
@@ -113,14 +137,17 @@ def docx_text(path):
     return _h.unescape("\n".join(paras))
 
 
-def cmd_ledger(args):
-    from ledger import parse_ledger, validate_rows, check_units, deck_units, text_units
+def cmd_ledger(args, sources=None):
+    from ledger import parse_ledger, validate_rows, check_units, deck_units, text_units, load_sources, verify_quotes
     if len(args) >= 2 and args[0].lower().endswith((".html", ".htm")) and args[1].lower().endswith((".md", ".markdown", ".txt")):
         ledger_path, targets = args[1], [args[0]] + args[2:]   # 旧形式: ledger deck.html ledger.md [file…]
     else:
         ledger_path, targets = args[0], args[1:]
+    if not Path(ledger_path).exists():
+        return emit([f"台帳が見つからない: {ledger_path}"], [])
     rows, errors = parse_ledger(Path(ledger_path).read_text(encoding="utf-8", errors="replace"))
     fails = errors + validate_rows(rows)
+    warns = []
     units, n_slides = [], 0
     for t in targets:
         p = Path(t)
@@ -140,10 +167,22 @@ def cmd_ledger(args):
         else:
             units += text_units(p.read_text(encoding="utf-8", errors="replace"), p.name)
     fails += check_units(units, rows)
+    # 確認済みの引用を、保存した原典の本文と照らす（--sources が無ければ台帳の隣の sources/）
+    n_confirmed = sum(1 for r in rows if r.status == "確認済み")
+    src_paths = [Path(x) for x in sources] if sources else [Path(ledger_path).resolve().parent / "sources"]
+    missing_src = [str(x) for x in src_paths if not x.exists()]
+    if sources and missing_src:
+        fails.append(f"--sources が見つからない: {', '.join(missing_src)}")
+    src = load_sources([x for x in src_paths if x.exists()])
+    if src:
+        fails += verify_quotes(rows, src)
+    elif n_confirmed:
+        warns.append(f"確認済み {n_confirmed} 行の引用を原典の本文と照らしていない（台帳の隣に sources/ が無い。"
+                     f"取得した本文を sources/raw/ に保存するか --sources で場所を渡す）")
     counts = Counter(r.status for r in rows)
     ok = [f"ledger: {len(rows)} 行（確認済み {counts.get('確認済み', 0)} / 未確認 {counts.get('未確認', 0)} / 本人提供 {counts.get('本人提供', 0)}）"
-          f"・照合した file {len(targets)}（スライド {n_slides} 枚）"]
-    return emit(fails, [], [] if fails else ok)
+          f"・照合した file {len(targets)}（スライド {n_slides} 枚）・原典の本文 {len(src)} file"]
+    return emit(fails, warns, [] if fails else ok)
 
 
 # ---------------------------------------------------------------- pii
@@ -303,6 +342,12 @@ def cmd_pptx(pptx_path, html_path, static=False, overflow="fail"):
             fails.append(f"p{i}: HTML の文字が pptx に無い {sum(miss.values())} 字{pic_note}: "
                          + " / ".join(f"「{ln[:30]}」" for ln in lines[:3]))
         hs = deck.slides[i - 1] if i - 1 < len(deck.slides) else None
+        slide_area = prs.slide_width * prs.slide_height
+        big = [sh for sh in slide.shapes if sh.shape_type == MSO_SHAPE_TYPE.PICTURE and sh.width and sh.height
+               and sh.width * sh.height >= slide_area * 0.5]
+        if big and (hs is None or not hs.has_media):
+            warns.append(f"p{i}: スライドの半分以上を画像が占めている（HTML に img・svg が無い。CSS の背景画像でなければ、"
+                         f"スライドが絵として書き出されていないか確かめる）")
         if hs is not None and hs.has_table > tables:
             fails.append(f"p{i}: HTML の表 {hs.has_table} 個に対し PowerPoint の表が {tables} 個（表が図や文字の箱になっている）")
         if hs is not None and hs.notes.strip():
@@ -318,6 +363,89 @@ def cmd_pptx(pptx_path, html_path, static=False, overflow="fail"):
     ok = [f"pptx: {len(slides)} 枚・テキストの箱 {n_text}・表 {n_tables}・画像 {n_pics}・ノート "
           f"{sum(1 for s in slides if s.has_notes_slide and s.notes_slide.notes_text_frame.text.strip())} 枚"]
     return emit(fails, warns, [] if fails else ok)
+
+
+# ---------------------------------------------------------------- review-evidence / manifest
+def _evidence(review_dir):
+    """(最後の巡, FAIL 理由, WARN)。FAIL 理由が空なら、最後の巡は別の文脈の検品として認める。"""
+    from review_evidence import check_review_dir
+    last, earlier, errs = check_review_dir(review_dir)
+    warns = []
+    for r in earlier:
+        if not r.ok:
+            warns.append(f"前の巡（{r.n} 巡目）の記録に不備: {r.fails[0]}")
+    if errs:
+        return None, errs, warns
+    warns += last.warns
+    return last, last.fails, warns
+
+
+def cmd_review_evidence(review_dir):
+    last, fails, warns = _evidence(review_dir)
+    if fails:
+        return emit([f"未検品: {f}" for f in fails], warns)
+    rec = last.record
+    return emit([], warns, [f"review-evidence: {last.n} 巡目 結論={last.verdict}（{rec.get('method')}・reviewer {rec.get('reviewer_id')}・"
+                            f"{rec.get('started_at')} 〜 {rec.get('ended_at')}）"])
+
+
+def cmd_manifest(out_dir, review_dir):
+    import json
+    from review_evidence import sha256
+    out = Path(out_dir)
+    mpath = out / "manifest.json"
+    if not mpath.exists():
+        return emit([f"未検品: 書き出しの記録 {mpath} が無い（build.py で書き出し直す）"], [])
+    try:
+        m = json.loads(mpath.read_text(encoding="utf-8"))
+    except ValueError as e:
+        return emit([f"未検品: {mpath} が JSON として読めない（{e}）"], [])
+    fails, warns = [], []
+    deck = m.get("deck") or {}
+    deck_sha = deck.get("sha256")
+    if not deck_sha:
+        fails.append("書き出しの記録に元の deck の sha256 が無い（build.py で書き出し直す）")
+    else:
+        dp = (out / deck.get("path", "")).resolve()
+        if not dp.exists():
+            fails.append(f"書き出しの元の {deck.get('path')} が見つからない")
+        elif sha256(dp) != deck_sha:
+            fails.append(f"書き出した後に {dp.name} が変わった（build.py で書き出し直してから検品し直す）")
+    listed = set()
+    for o in m.get("outputs", []):
+        f = out / o.get("file", "")
+        listed.add(f.name)
+        if not f.exists():
+            fails.append(f"記録にある {o.get('file')} が無い")
+        elif sha256(f) != o.get("sha256"):
+            fails.append(f"{f.name} が書き出した後に変わった（手で直した file は渡さない。HTML を直して書き出し直す）")
+        if deck_sha and o.get("deck_sha256") != deck_sha:
+            fails.append(f"{o.get('file')} は今の deck より前の版から書き出したもの")
+    if not m.get("outputs"):
+        fails.append("書き出した file の記録が無い")
+    for f in sorted(out.iterdir()) if out.is_dir() else []:
+        if f.is_file() and f.name not in listed and f.name != "manifest.json" and f.suffix.lower() in (".pptx", ".pdf", ".md", ".docx", ".html"):
+            warns.append(f"{f.name} は書き出しの記録に無い（照合できないので渡さない）")
+    last, efails, ewarns = _evidence(review_dir)
+    warns += ewarns
+    fails += [f"未検品: {f}" for f in efails]
+    if last is not None and not efails:
+        h = last.record.get("inputs_sha256") or {}
+        if deck_sha and h.get("deck") != deck_sha:
+            fails.append(f"未検品: 書き出した deck は {last.n} 巡目で検品した deck と違う（sha256 が違う）")
+        led = m.get("ledger") or {}
+        if led.get("sha256") and h.get("ledger") != led["sha256"]:
+            fails.append(f"未検品: 書き出した時の台帳は {last.n} 巡目で検品した台帳と違う")
+        br = m.get("brief") or {}
+        if br.get("sha256") and h.get("brief") != br["sha256"]:
+            fails.append(f"未検品: 書き出した時の BRIEF は {last.n} 巡目で検品した BRIEF と違う")
+    if fails:
+        return emit(fails, warns)
+    state = "検品済み" if last.verdict == "合格" else "検品済み・指摘が残っています"
+    if last.verdict != "合格":
+        warns.append(f"{last.n} 巡目の結論が「{last.verdict}」（直してもう一度検品するか、本人の判断を BRIEF の決定ログに残してから渡す）")
+    files = ", ".join(sorted(listed))
+    return emit([], warns, [f"manifest: 状態={state}（review-{last.n}・渡せる file: {files}）"])
 
 
 def main():
@@ -345,8 +473,12 @@ def main():
         strict = flag("--strict")
         phrases = opt("--phrases")
         return cmd_deck(args[0], strict, phrases)
-    if cmd == "ledger" and len(args) >= 2:
-        return cmd_ledger(args)
+    if cmd == "ledger":
+        sources = []
+        while "--sources" in args:
+            sources.append(opt("--sources"))
+        if len(args) >= 2:
+            return cmd_ledger(args, sources)
     if cmd == "pii" and args:
         allow = []
         while "--allow" in args:
@@ -356,6 +488,10 @@ def main():
         static = flag("--static")
         overflow = opt("--overflow", "fail")
         return cmd_pptx(args[0], args[1], static, overflow)
+    if cmd == "review-evidence" and args:
+        return cmd_review_evidence(args[0])
+    if cmd == "manifest" and len(args) >= 2:
+        return cmd_manifest(args[0], args[1])
     print(__doc__)
     return 2
 
