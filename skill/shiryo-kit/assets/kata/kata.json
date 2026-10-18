@@ -175,8 +175,9 @@
    "sample": "seminar/sample.html",
    "preview": "seminar/preview.png",
    "optional_parts": {
-    "note": "下の部品は現状 pptx 書き出しで文字が約1.25倍に膨らむ（README 既知の問題）ため、サンプルでは使っていない。不具合が直るまでは追加しない",
-    "ids": "m01 m10 m12 m21 m22 m26 m35"
+    "note": "追加パーツ集 (m 系) は U1b で split_css と zoom が直り、new_deck.py → build.py → check.py pptx が通る。サンプルは b 系だけで組んでいる (写し替えない)。同じ役割の枚を差し替える候補: m22 (状況・問題・解決の流れ)、m26 (現状と目指す姿)。m10 は見本の文字のままだと check.py pptx が「箱の幅を超えそう」と FAIL する (狭い欄) ため推奨しない。使った後は、文言を書き換えてから check.py pptx で確かめる",
+    "ids": "m01 m12 m21 m22 m26 m35",
+    "avoid": "m10"
    }
   },
   {
@@ -274,8 +275,9 @@
    "sample": "advisory/sample.html",
    "preview": "advisory/preview.png",
    "optional_parts": {
-    "note": "下の部品は現状 pptx 書き出しで文字が約1.25倍に膨らむ（README 既知の問題）ため、サンプルでは使っていない。不具合が直るまでは追加しない",
-    "ids": "m01 m10 m12 m21 m22 m26 m35"
+    "note": "追加パーツ集 (m 系) は U1b で split_css と zoom が直り、new_deck.py → build.py → check.py pptx が通る。サンプルは b 系だけで組んでいる (写し替えない)。同じ役割の枚を差し替える候補: m01 (結論)、m12 (リスク)、m26 (現状と目指す姿)、m35 (決めてほしいこと)。m10 は見本の文字のままだと check.py pptx が「箱の幅を超えそう」と FAIL する (狭い欄) ため推奨しない。使った後は、文言を書き換えてから check.py pptx で確かめる",
+    "ids": "m01 m12 m21 m22 m26 m35",
+    "avoid": "m10"
    }
   },
   {
@@ -373,8 +375,9 @@
    "sample": "proposal/sample.html",
    "preview": "proposal/preview.png",
    "optional_parts": {
-    "note": "下の部品は現状 pptx 書き出しで文字が約1.25倍に膨らむ（README 既知の問題）ため、サンプルでは使っていない。不具合が直るまでは追加しない",
-    "ids": "m01 m10 m12 m21 m22 m26 m35"
+    "note": "追加パーツ集 (m 系) は U1b で split_css と zoom が直り、new_deck.py → build.py → check.py pptx が通る。サンプルは b 系だけで組んでいる (写し替えない)。同じ役割の枚を差し替える候補: m22 (相手の状況と困りごと)、m21 (打ち手)、m35 (決めてほしいこと)。m10 は見本の文字のままだと check.py pptx が「箱の幅を超えそう」と FAIL する (狭い欄) ため推奨しない。使った後は、文言を書き換えてから check.py pptx で確かめる",
+    "ids": "m01 m12 m21 m22 m26 m35",
+    "avoid": "m10"
    }
   },
   {
@@ -460,8 +463,9 @@
    "sample": "report/sample.html",
    "preview": "report/preview.png",
    "optional_parts": {
-    "note": "下の部品は現状 pptx 書き出しで文字が約1.25倍に膨らむ（README 既知の問題）ため、サンプルでは使っていない。不具合が直るまでは追加しない",
-    "ids": "m01 m10 m12 m21 m22 m26 m35"
+    "note": "追加パーツ集 (m 系) は U1b で split_css と zoom が直り、new_deck.py → build.py → check.py pptx が通る。サンプルは b 系だけで組んでいる (写し替えない)。同じ役割の枚を差し替える候補: m01 (結論)、m12 (要対応事項)、m21 (次にやること)。m10 は見本の文字のままだと check.py pptx が「箱の幅を超えそう」と FAIL する (狭い欄) ため推奨しない。使った後は、文言を書き換えてから check.py pptx で確かめる",
+    "ids": "m01 m12 m21 m22 m26 m35",
+    "avoid": "m10"
    }
   }
  ]

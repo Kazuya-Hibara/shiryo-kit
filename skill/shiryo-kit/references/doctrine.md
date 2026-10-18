@@ -102,4 +102,4 @@
 実務者・Web (数値は既定値として扱う):
 - slideworks.io (action titles, SCR) / deckary.com (consulting slide standards, executive summary) / storytellingwithdata.com (horizontal logic, 2013)
 
-提供者 (A&A) のプレゼン判断の知識ベースと社内の検品基準を要約・一般化した (非公開。外部の原文の引用はしていない)。
+提供者のプレゼン判断の知識ベースと社内の検品基準を要約・一般化した (非公開。外部の原文の引用はしていない)。

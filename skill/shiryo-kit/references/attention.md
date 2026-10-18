@@ -98,7 +98,7 @@ spec_rev: <依頼文の spec_rev をそのまま>
 
 ## 出典
 
-- 正本の file を節目ごとに読み直す・依頼文と返事の決まった形・論点の台帳・作り手と点検役の分離・点検役に渡す物を絞る・直しは 2 巡まで: 提供者 (A&A) の社内の注意力設計 (attention engineering) をこの skill 向けに一般化
+- 正本の file を節目ごとに読み直す・依頼文と返事の決まった形・論点の台帳・作り手と点検役の分離・点検役に渡す物を絞る・直しは 2 巡まで: 提供者の社内の注意力設計 (attention engineering) をこの skill 向けに一般化
 - 文脈なしに当てた修正はずれを生む、直す前に正本と元の入力を読み直す: BMAD-METHOD の Update mode (MIT)
 - 承認の範囲は見せた物まで: obra/superpowers `brainstorming` (MIT)
 - 答えを記録したら正本に反映し、矛盾を残さない: github/spec-kit `/clarify` (MIT)

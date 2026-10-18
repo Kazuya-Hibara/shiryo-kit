@@ -58,14 +58,15 @@
 5. `python3 scripts/build.py <sample.html> --out <作業フォルダ>` の後に `python3 scripts/check.py pptx <出力>.pptx <sample.html>` が OK になること。
 6. `kata.json` の `kata` に 1 件足す (`id` / `name` / `when` / `fits` / `audience` / `slides` / `mode` / `density` / `tone` / `flow` / `default_skin` / `skins` / `parts` / `sequence` / `sample` / `preview`)。この README の表も更新する。
 
-## 部品の選び方についての注意 (既知の問題)
+## 部品の選び方についての注意
 
-サンプルは基本パーツ集 (`b01`〜`b27`) だけで組んでいる。追加パーツ集の `m01`〜`m35` は現状では使えない。
+サンプルは基本パーツ集 (`b01`〜`b27`) だけで組んでいる。追加パーツ集 (`m01`〜`m35`) も使える。以前あった 2 つの不具合 (`new_deck.py` の `split_css` が m 系の `:root` を壊す・`html_to_pptx.py` が CSS の `zoom` を文字サイズに反映しない) は直してある。
 
-- `new_deck.py` が追加パーツ集の `:root` (余白・版面の変数) を壊す。`assets/parts/freeform_parts_more_16x9.html` の冒頭コメントに `<style>` という文字列があり、`split_css` がそこから CSS を切り出すため。m 系の枚だけ余白が 0 になり、PDF では紙面の左上に縮んで出る。
-- `html_to_pptx.py` が CSS の `zoom: 0.8` を文字サイズに反映しない。m 系の枚は pptx で文字が約 1.25 倍になり、`check.py pptx` が「箱の幅を超えそう」と FAIL する。
+- 確かめたこと: `new_deck.py --parts m01,m12,m21,m35,b06` → `build.py` → `check.py pptx` が OK。`m22`・`m26` も 1 枚ずつ同じ手順で OK。
+- `m10` (選択肢の比較表) は、見本の文字のままだと `check.py pptx` が「箱の幅を超えそう」と FAIL する (欄が狭い)。使う時は文言を書き換えてから確かめる。
+- LibreOffice や PowerPoint での目視はしていない。サンプルの画像 (`preview.png`) は作り直していない。
 
-両方が直るまで、`kata.json` の `optional_parts` にある ID (m01 m10 m12 m21 m22 m26 m35) は追加しない。直ったら、同じ役割の枚 (結論・比較・リスク・まとめ) をそちらに差し替えられる。
+`kata.json` の `optional_parts` に、型ごとに差し替え候補の m 系 ID を書いた (`ids` = 使える、`avoid` = 注意)。同じ役割の枚 (結論・比較・リスク・まとめ) を差し替えたい時だけ使う。使った枚も、納品前の検査 (`check.py deck` → `build.py` → `check.py pptx`) は同じ。
 
 ## 出どころ
 

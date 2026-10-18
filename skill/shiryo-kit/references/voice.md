@@ -134,5 +134,5 @@ EOF
 
 - 文章の集まりから書き方の規則を抜き出し、書く前に読み直す方法: larashero3-dotcom/writing-dna-skill (MIT, https://github.com/larashero3-dotcom/writing-dna-skill)
 - AI の下書きと本人の完成版の差から規則を学ぶ考え方: jzOcb/writing-style-skill (ライセンス表示なしのため考え方のみ参照。文言・コードは使っていない)
-- 5 つの観点 (語彙・リズム・調子・構成・使わない言い方)、2 点以上の根拠、根拠が無ければ未設定: 提供者 (A&A) の社内の文体抽出手順を一般化
+- 5 つの観点 (語彙・リズム・調子・構成・使わない言い方)、2 点以上の根拠、根拠が無ければ未設定: 提供者の社内の文体抽出手順を一般化
 - 好みは見本を見せて選ばせる: zarazhangrui/frontend-slides (MIT)

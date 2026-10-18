@@ -108,6 +108,6 @@ BRIEF.md の先頭の spec_rev を、subagent への依頼文と返事の両方�
 
 ## 出典
 
-- 番号付き要件・状態の 3 区分・空欄を空欄で残す: 提供者 (A&A) の社内ブリーフ雛形を一般化
+- 番号付き要件・状態の 3 区分・空欄を空欄で残す: 提供者の社内ブリーフ雛形を一般化
 - 答えを記録して該当節に反映する・矛盾を残さない: github/spec-kit `/clarify` の Clarifications 記録 (MIT)
 - 追記のみの決定ログ (決定・変更・上書き・仮定): BMAD-METHOD の `.memlog.md` (MIT, https://github.com/bmad-code-org/BMAD-METHOD)

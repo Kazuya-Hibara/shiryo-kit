@@ -31,7 +31,7 @@ compatibility: >-
 - **関門 1 — 承認前に作らない。** BRIEF.md に本人の承認記録 (日時と本人の言葉) が入るまで、スライド・原稿・骨子の本文を書かない。「いいから作って」と言われても、止める項目 (目的・受け手・成果物) を推奨答つきで一度に示し、承認を一言もらう。黙っていた・返事が無いのは承認ではない。
 - **関門 2 — 取得した引用なしに「確認済み」と書かない。** モデルの記憶・二次情報 (解説記事・他事務所のサイト)・本人の記憶だけでは「確認済み」にしない。取得失敗・リンク切れ・内容の不一致・基準日に有効でない (旧制度・公布済み未施行・対象違い) は「未確認」。
 - **関門 3 — 未確認は [要確認] で見せる。** 未確認の主張は、スライド・読み原稿・図表のどこにあっても [要確認] を表示し、数字や日付を推測で埋めない。
-- **関門 4 — 別文脈の検品なしに「完了」と言わない。** 検品は、作り手の会話を持たない subagent か、新しく起動した別プロセスが行い、結果を file に残す。どちらも使えなかった時、または納品する版が検品した版と違う時は、成果物と最後の報告に「未検品」と書く。
+- **関門 4 — 別文脈の検品なしに「完了」と言わない。** 検品は、作り手の会話を持たない subagent か、新しく起動した別プロセスが行い、結果を file に残す。「別の文脈で行った」ことは、作り手の申告ではなく `scripts/review_record.py` が取る記録 (時刻・pid・終了コード・出力・渡した file の sha256) で示す。記録が揃わない時、どちらも使えなかった時、または納品する版が検品した版と違う時は、成果物と最後の報告に「未検品」と書く。
 - **関門 5 — 見せてから保存する。** メモリーに保存する内容は、保存前に本人に見せて了承を得る。保存前に `scripts/check.py pii <保存する内容のフォルダ>` を通し、顧問先の個人情報 (氏名・連絡先・健康情報など) を残さない。
 - **関門 6 — 直したら戻る。** 修正・書き出しのたびに、変わった範囲に応じて出典確認 (P3)・検品 (P5)・描画確認に戻る。戻り先の決め方は `references/revision.md`。
 
@@ -80,7 +80,7 @@ compatibility: >-
 ### P3 出典台帳
 
 1. 骨子と下書きのすべて (スライド本文・読み原稿・図表・表・注記) から、確認が要る主張を抜き出す。
-2. 原典を取得し (環境ごとの道具は `references/evidence.md` §3)、生の本文を `sources/raw/` に保存し、該当箇所を引用として残す。引用は生の本文に同じ文字列があることを確かめる。基準日時点で有効か (施行日・経過措置・対象・公布済み未施行か) を確かめる。取れない・合わない時は未確認。
+2. 原典を取得し (環境ごとの道具は `references/evidence.md` §3)、生の本文を `sources/raw/` に保存し (PDF は .txt にした物も置く)、該当箇所を引用として残す。引用が生の本文に同じ文字列で有ることは `check.py ledger` が確かめる。基準日時点で有効か (施行日・経過措置・対象・公布済み未施行か) を確かめる。取れない・合わない時は未確認。
 3. 区分は「原典確認済み / 未確認 / 本人提供」。手順・優先する原典・罠は `references/evidence.md`。台帳ファイルの書式は `references/html-contract.md`。
 
 台帳は下書きの後にもう一度、全文から抜き出し直し、`python3 scripts/check.py ledger ledger.md deck.html [ほかの成果物 ...]` で全成果物と突き合わせる (下書きで新しい主張が増えるため)。
@@ -92,15 +92,15 @@ HTML スライドと、求められた成果物 (読み原稿・配布資料) �
 
 ### P6 書き出し (検品用の版)
 
-`python3 scripts/build.py <deck.html> --out <案件フォルダ>/out` で pptx・PDF・読み原稿を作る (`--formats` で絞れる。詳細は `references/html-contract.md`)。
+`python3 scripts/build.py <deck.html> --out <案件フォルダ>/out` で pptx・PDF・読み原稿と、書き出しの記録 `out/manifest.json` を作る (`--formats` で絞れる。詳細は `references/html-contract.md`)。
 書き出せない環境では HTML のまま検品に進み、利用者に「pptx はまだ作れていません」と理由つきで伝える。描画部品の差し替えは `references/adapters.md`。
 
 ### P5 検品 (作り手と別の文脈)
 
-1. 機械チェックを通す: `python3 scripts/check.py deck deck.html`、`python3 scripts/check.py ledger ledger.md deck.html [ほかの成果物 ...]`、pptx があれば `python3 scripts/check.py pptx out/<名前>.pptx deck.html`。
+1. 機械チェックを通す: `python3 scripts/check.py deck deck.html`、`python3 scripts/check.py ledger ledger.md deck.html [ほかの成果物 ...]` (台帳の隣の `sources/` があれば、引用を原典の本文と自動で照らす)、pptx があれば `python3 scripts/check.py pptx out/<名前>.pptx deck.html`、顧問先名や個人名の残りを見る `python3 scripts/check.py pii deck.html`。
 2. reviewer を作り手と別の文脈で起動する (Claude Code = 会話を引き継がない subagent、Codex = subagent か新しい `codex exec` プロセス)。渡すのは `BRIEF.md`・`ledger.md`・`deck.html` の 3 つの path だけ。作り手の説明・会話・前の検品結果は渡さない。
 3. reviewer は原典との一致・言い過ぎ・要件の充足・受け手として読めるかを点検し、結果を `review/review-<n>.md` に書く。
-4. 進行役が独立の記録 (起動の方法・時刻・渡した path・reviewer の識別子・終了コード) を `review/` に書き、`python3 scripts/check.py review-evidence review` を通す。通らない検品は無かったものとして扱う。
+4. 起動は `scripts/review_record.py` を通す (subagent なら起動の直前に `start review --round <n>`、返事の直後に `finish review --round <n> --reviewer-id <id>`。別プロセスなら `run review --round <n> --stdin review/request-<n>.md -- <起動 command>`)。時刻・pid・終了コード・渡した path の sha256 は script が `review/independence-<n>.json` に書く。進行役は手で書かない。その後 `python3 scripts/check.py review-evidence review` を通す。通らない検品は無かったものとして扱う。
 5. 直しは既定で 2 巡まで。収まらなければ、残った指摘を本人に見せて判断を仰ぐ。
 
 起動の仕方 (Claude Code / Codex)、reviewer への依頼文、記録の形は `references/review.md`。
@@ -135,7 +135,7 @@ ledger.md       出典台帳 (P3、書式は references/html-contract.md)
 sources/        取得した原典の抜き書き (URL・取得日時・引用)。raw/ に取得した生の本文
 deck.html       スライド本体 (読み原稿を含む)
 out/            書き出した pptx・PDF
-review/         検品の依頼文・結果・独立の記録 (JSON)・実行記録
+review/         検品の依頼文・結果・独立の記録 (review_record.py が書く JSON)・実行記録
 issues.md       指摘と未決の台帳
 work/           subagent や別プロセスへの依頼文と返事
 versions.md     版の記録 (検品した版と納品した版の対応)

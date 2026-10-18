@@ -8,11 +8,11 @@ or an official version of that project or its authors. Trademarks of the origina
 authors are not used in the name of this product.
 
 Derived files (modified unless noted):
-  skill/shiryo-kit/scripts/html_to_pptx.py   speaker notes, neutral document properties, dependency messages
-  skill/shiryo-kit/scripts/html_dump.mjs     keeps the author's spaces between Japanese characters, never draws aside.notes, text export
+  skill/shiryo-kit/scripts/html_to_pptx.py   speaker notes, neutral document properties, dependency messages, bullet text box widened by the hanging indent (add_text)
+  skill/shiryo-kit/scripts/html_dump.mjs     keeps the author's spaces between Japanese characters, never draws aside.notes, text export, effective CSS zoom applied to font sizes, spacing and borders
   skill/shiryo-kit/scripts/lib_cdp.mjs       Chrome/Edge/Chromium discovery (macOS/Windows/Linux), SHIRYO_CHROME_WAIT_MS, error messages
-  skill/shiryo-kit/scripts/check_deck.py     no hard-coded tool name, parts path, notes excluded, rule-document references removed
-  skill/shiryo-kit/scripts/new_deck.py       parts path, empty <aside class="notes"> per slide
+  skill/shiryo-kit/scripts/check_deck.py     no hard-coded tool name, parts path, notes excluded, rule-document references removed (not changed since; the relaxed title rules live in check.py)
+  skill/shiryo-kit/scripts/new_deck.py       parts path, empty <aside class="notes"> per slide, split_css finds the first <style> after stripping HTML comments
   skill/shiryo-kit/scripts/pptx_open.py      unchanged
   skill/shiryo-kit/scripts/data/banned_phrases.txt   partly from the upstream AI-smell word list
   skill/shiryo-kit/assets/parts/freeform_parts_16x9.html        default back-cover credit line removed

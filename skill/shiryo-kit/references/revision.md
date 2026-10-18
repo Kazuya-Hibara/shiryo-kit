@@ -35,7 +35,9 @@ python3 <skill>/scripts/check.py ledger ledger.md deck.html [ほかの成果物 
 # 3. 書き出しと描画の確認
 python3 <skill>/scripts/build.py deck.html --out out
 python3 <skill>/scripts/check.py pptx out/<名前>.pptx deck.html
-# 4. 検品 (review.md の手順。新しい reviewer、渡すのは 3 つの path だけ)
+# 4. 検品 (review.md の手順。新しい reviewer、渡すのは 3 つの path だけ。起動は review_record.py を通す)
+python3 <skill>/scripts/review_record.py start review --round <n+1>   # または run (別プロセス)
+python3 <skill>/scripts/review_record.py finish review --round <n+1> --reviewer-id <id>
 python3 <skill>/scripts/check.py review-evidence review
 # 5. 渡す前の照合
 python3 <skill>/scripts/check.py manifest out review
@@ -83,4 +85,4 @@ python3 <skill>/scripts/check.py manifest out review
 
 - 直す前に正本と元の入力を読み直す (文脈なしの修正はずれになる): BMAD-METHOD の Update mode (MIT)
 - 証拠を新しく取ってから完了と言う: obra/superpowers `verification-before-completion` (MIT)
-- 監査した物と渡す物を hash で対応させ、差し替えを見つける: 提供者 (A&A) の社内の検品手順を一般化
+- 監査した物と渡す物を hash で対応させ、差し替えを見つける: 提供者の社内の検品手順を一般化

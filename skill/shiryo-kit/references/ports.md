@@ -73,8 +73,8 @@
 
 - 目的: 作り手の思い込みを、別の目で見つける。
 - 入力 (reviewer に渡す path はこれだけ): `BRIEF.md`・`ledger.md`・`deck.html`。reviewer はそこから辿れる `sources/`・`out/` と原典の URL を自分で開き、`scripts/check.py` を道具として使う。
-- 出力: `review/review-<n>.md` (結論・指摘) と、進行役が書く独立の記録 (JSON)。`check.py review-evidence review` が通ること。
-- 必要な能力: subagent か別プロセス。
+- 出力: `review/review-<n>.md` (結論・指摘) と、`scripts/review_record.py` が書く独立の記録 (`review/independence-<n>.json`、別プロセスなら `run-<n>.jsonl` も)。進行役は記録を手で書かない (自己申告にしない)。`check.py review-evidence review` が通ること。
+- 必要な能力: subagent か別プロセス (起動は `review_record.py start`/`finish` か `review_record.py run` を通す)。
 - 無い時: 機械チェックと作り手自身の点検はしてよいが、結果を「未検品」と表示する (関門 4)。自分の点検を「独立検品」と呼ばない。
 - 失敗時: reviewer が起動しない・途中で落ちる・`review-evidence` が通らない → 1 回だけ起動し直す。だめなら「未検品」。納品前の `check.py manifest out review` が通らない → 検品し直すか「未検品」。指摘が既定 2 巡の直しで尽きない → 残りを本人に見せて判断を仰ぐ。
 - 詳細: `review.md`。

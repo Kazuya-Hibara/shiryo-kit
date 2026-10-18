@@ -139,4 +139,4 @@ persona は 15 行以内で、次を持つ:
 - 好みは言葉でなく実物を見せて選ばせる: zarazhangrui/frontend-slides (MIT, https://github.com/zarazhangrui/frontend-slides)
 - 誘導しない・二重質問を避ける・抽象は選択式に: Steve Portigal『Interviewing Users』、Erika Hall『Just Enough Research』の一般的な面談規律を要約
 - 答えを疑う確かめ方: Rob Fitzpatrick『The Mom Test』(過去の事実で聞く)、laddering / 5 Whys (一段上)、JTBD の 4 つの力 (見落とし探し) の要約
-- 項目に状態 (確定/仮定/未確定) を付け空白を埋めない運用、受け手 persona の項目: 提供者 (A&A) の社内ヒアリング手順を一般化
+- 項目に状態 (確定/仮定/未確定) を付け空白を埋めない運用、受け手 persona の項目: 提供者の社内ヒアリング手順を一般化

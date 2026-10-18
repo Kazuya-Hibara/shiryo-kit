@@ -7,12 +7,12 @@
 
 | 役 | 何をするか | Claude Code | Codex |
 |---|---|---|---|
-| 進行役 | P0〜P8 の段取り、ヒアリング、BRIEF、骨子と下書き、出典の取得と照合、修正 | Opus 5.5、effort high (既定) | Astra、`model_reasoning_effort = "high"` |
+| 進行役 | P0〜P8 の段取り、ヒアリング、BRIEF、骨子と下書き、出典の取得と照合、修正 | Opus 5.5、effort high (既定) | Astra = Codex のモデル ID `gpt-6-astra`、effort high (`codex exec` なら `-m gpt-6-astra -c model_reasoning_effort="high"`、設定ファイルなら `model = "gpt-6-astra"` と `model_reasoning_effort = "high"`) |
 | 読み取り役 (任意) | 過去資料が多い時の抜き出し (要点と口調の引用だけを返す) | subagent。進行役と同じモデルを推奨 | subagent か `codex exec`。同上 |
 | 検品役 | P5。作り手と別の文脈で点検する | subagent (会話を引き継がない種類)。進行役と同じ上位モデルでよい | 新しい `codex exec` プロセス (既定)、または subagent。同上 |
 
-- 正直な注記: Codex の Astra (high) でも全工程が動く設計だが、Opus 5.5 (high) より品質が少し落ちる (提供者の評価)。差の観察は試験記録で更新する。README にも同じことを書く。
-- モデルの選び方は各ツールの設定に従う (Claude Code はモデル選択と effort の設定、Codex は `-m` か設定ファイルの `model` と `model_reasoning_effort`)。
+- 正直な注記: Codex の Astra (`gpt-6-astra`、effort high) でも全工程が動く設計だが、Opus 5.5 (high) より品質が少し落ちる (提供者の評価)。差の観察は試験記録で更新する。README にも同じことを書く。
+- モデルの選び方は各ツールの設定に従う (Claude Code はモデル選択と effort の設定、Codex は `-m` か設定ファイルの `model` と `model_reasoning_effort`)。検品役を別プロセスで起動する時も同じ指定を `codex exec` に付ける (`review.md` §起動の仕方の例は effort だけ書いてある。モデルを明示したい時は `-m gpt-6-astra` を足す)。
 - 進行役より弱いモデルを検品役にしない。同じモデルでよい — 大事なのは別の文脈であること。
 - 利用者 (人) への質問は進行役だけが行う。subagent や別プロセスは利用者に質問しない。
 

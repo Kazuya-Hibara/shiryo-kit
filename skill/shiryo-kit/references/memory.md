@@ -90,4 +90,4 @@ skill フォルダの中には保存しない (更新で消える・書けない
 - 記憶を小さな名前付き file に分け、追記と置き換えを分ける考え方: BMAD-METHOD の memory-agent の形 (MIT, https://github.com/bmad-code-org/BMAD-METHOD)
 - 最初に探して見つかったかを言う、見せてから書く: mattpocock/skills `setup-matt-pocock-skills` (MIT)
 - 前回の答えを推奨答にする組み合わせ: 調査メモ (R2) の設計案 (既存の OSS には無い組み合わせ)
-- 個人情報を写さない・読む前に場所を本人に決めてもらう: 提供者 (A&A) の設計判断
+- 個人情報を写さない・読む前に場所を本人に決めてもらう: 提供者の設計判断

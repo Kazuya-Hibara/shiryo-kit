@@ -11,7 +11,7 @@
 - reviewer に渡すのは **3 つの path だけ**: `BRIEF.md`・`ledger.md`・`deck.html`。作り手の感想・「ここは確認済みです」などの説明・途中の下書き・会話の要約・前の回の検品結果は渡さない。
 - reviewer は、渡された file から辿れる物 (台帳にある `sources/` の抜き書きと URL、`out/` の書き出し) を自分で開き、skill フォルダの `scripts/check.py` と `references/doctrine.md` を道具として使ってよい。
 - reviewer は成果物を直さない。点検結果の file だけを書く。
-- 進行役が **独立の記録** (`review/` の JSON。下記) を書き、`check.py review-evidence` が通る。作り手の「点検しました」は証拠にしない。
+- **独立の記録** (`review/independence-<n>.json`) は `scripts/review_record.py` が取り (起動の時刻・pid・終了コード・出力・渡した file の sha256)、`check.py review-evidence` が通る。進行役は JSON を手で書かない。作り手の「点検しました」は証拠にしない。
 
 どれかを満たせない時は、機械チェックと作り手自身の点検をした上で、結果を **未検品** とする (§どちらも使えない時)。
 
@@ -24,13 +24,17 @@
    python3 <skill>/scripts/check.py deck deck.html
    python3 <skill>/scripts/check.py ledger ledger.md deck.html [配布資料.html ...] [out/<名前>_読み原稿.md]
    python3 <skill>/scripts/check.py pptx out/<名前>.pptx deck.html
+   python3 <skill>/scripts/check.py pii deck.html
    ```
+   - `ledger` は台帳の隣の `sources/` (取得した原典の本文) があれば、確認済みの引用をそこと自動で照らす。PDF は `pdftotext` などで .txt にして置く。
+   - `pii` は、顧問先名・個人の名前・連絡先が資料に残っていないかの機械の補助 (C の点検の入口。「ここは出してよい」と本人が決めた語は `--allow` で外す)。出た行は本人に確かめる。
 2. 依頼文を `review/request-<n>.md` に書く (下の雛形。path を埋めるだけ)。
-3. 起動する (§起動の仕方)。起動した時刻・終わった時刻・終了コード・reviewer の識別子 (subagent の id か、プロセスの pid) を控える。
-4. reviewer が `review/review-<n>.md` を書いたことを確かめる。無ければ 1 回だけ起動し直す。だめなら未検品。
-5. 独立の記録を `review/` に JSON で書く (§独立の記録)。
-6. `python3 <skill>/scripts/check.py review-evidence review` を実行する。通らなければ、その検品は無かったものとして扱う (記録を直せるなら直す。起動し直すか、未検品)。
-7. 結論が「直しが必要」なら §直しの回し方。「合格」なら納品へ (SKILL.md 納品、`check.py manifest`)。
+3. **起動と記録は `scripts/review_record.py` を通す** (§起動の仕方)。時刻・終了コード・reviewer の識別子は script が取る。進行役が時計を見て書いたり、JSON を作ったりしない。
+   - subagent: 起動の直前に `review_record.py start review --round <n>`、返事が返った直後に `review_record.py finish review --round <n> --reviewer-id <返ってきた id>`。
+   - 別プロセス: `review_record.py run review --round <n> --stdin review/request-<n>.md -- <起動 command>`。
+4. reviewer が `review/review-<n>.md` を書いたことを確かめる。無ければ `--force` を付けて 1 回だけ起動し直す。だめなら未検品。
+5. `python3 <skill>/scripts/check.py review-evidence review` を実行する (内容は `html-contract.md` §5.1)。通らなければ、その検品は無かったものとして扱う。独立の記録は手で直さない。起動し直すか、未検品。確かめたい時は `review_record.py show review --round <n>`。
+6. 結論が「直しが必要」なら §直しの回し方。「合格」なら納品へ (SKILL.md 納品、`check.py manifest`)。
 
 ## reviewer への依頼文 (review/request-<n>.md)
 
@@ -45,15 +49,17 @@
 利用者に質問はできません。分からない所は「点検できなかったこと」に書いてください。
 成果物は直さないでください。結果は <案件フォルダ>/review/review-<n>.md に書いてください。
 判断の軸: <skill>/references/doctrine.md / 点検の項目と結果の形: <skill>/references/review.md の §点検項目 と §結果の形
+`review/independence-<n>.json` と `review/run-<n>.*` は記録用です。開いても書き換えないでください。
 
 ## やること
 1. 機械チェックを自分で実行し、command・終了コード・出力をそのまま記録する:
    python3 <skill>/scripts/check.py deck <案件フォルダ>/deck.html
    python3 <skill>/scripts/check.py ledger <案件フォルダ>/ledger.md <案件フォルダ>/deck.html <ほかの成果物>
    python3 <skill>/scripts/check.py pptx <案件フォルダ>/out/<名前>.pptx <案件フォルダ>/deck.html
+   python3 <skill>/scripts/check.py pii <案件フォルダ>/deck.html
 2. 台帳の「確認済み」の行は、できる限り原典の URL を開き直して照らす。開けなければ sources/ の抜き書きで照らし、その旨を書く。
 3. 点検項目 A〜F を順に見る。
-4. 点検した file (deck.html・ledger.md・BRIEF.md・out/ の file) の sha256 を自分で計算して記録する。
+4. 点検した file (deck.html・ledger.md・BRIEF.md・out/ の file) の sha256 を自分で計算して記録する (deck.html の sha256 は必ず結果に書く)。
 5. 結論を「合格」か「直しが必要」で書く。
 
 最後の 1 行: spec_rev: <BRIEF の spec_rev をそのまま>
@@ -77,7 +83,7 @@
 
 **C. 要件の充足**
 - BRIEF の要件 (B-01…) ごとに、どこで満たしているか (スライド番号) / 満たしていないか。
-- 「言わないこと」に触れていないか。出さない固有名・顧問先の個人情報が出ていないか。
+- 「言わないこと」に触れていないか。出さない固有名・顧問先の個人情報が出ていないか (`check.py pii deck.html` の結果を見た上で、機械が拾えない呼び方も目で見る)。
 - 成果物の組合せが BRIEF の通りか。
 
 **D. 受け手として読む**
@@ -122,30 +128,39 @@
 spec_rev: <n>
 ```
 
+結論の行は「合格」「直しが必要」のどちらか一方だけを残す (雛形の `合格 / 直しが必要` のままだと、`check.py review-evidence` が未検品にする)。最後の行の `spec_rev:` と、点検した deck.html の sha256 も必ず書く。
+
 結論が「合格」と言えるのは、必須の指摘が 0 件で、機械チェックが全部通った時だけ。
 
 ## 独立の記録
 
-進行役が、起動のたびに `review/` に JSON で書く。項目と file 名の正は `html-contract.md` (`check.py review-evidence` がそれを読む)。中身の意味:
+`review/independence-<n>.json` は `scripts/review_record.py` が書く (AC-07: 検品が別の文脈で行われたことを、作り手の自己申告ではなく script が取った記録で示す)。項目と file 名の正は `html-contract.md` §5.1 (`check.py review-evidence` がそれを読む)。進行役が知っておくこと:
 
-| 項目 | 書くこと |
+| 項目 | 誰が決めるか |
 |---|---|
-| method | `subagent` か `fresh-process` |
-| 起動した時刻・終わった時刻 | 実際の時刻 (推測で書かない) |
-| inputs | 渡した path。`BRIEF.md`・`ledger.md`・`deck.html` の 3 つだけ |
-| reviewer の識別子 | subagent なら返ってきた id、別プロセスなら pid |
-| exit | 終了コード (subagent で取れない時は html-contract.md の決まりに従う) |
-| 結果 | `review/review-<n>.md` |
+| method (`subagent` か `fresh-process`) | `start` は subagent、`run` は fresh-process。script が書く |
+| 起動した時刻・終わった時刻 | script が時計から取る (`start`/`finish`、`run` の前後) |
+| inputs | `BRIEF.md`・`ledger.md`・`deck.html` の 3 つ。script が path と sha256 を取る |
+| reviewer の識別子 | subagent なら返ってきた id (`finish --reviewer-id` で渡す)。別プロセスなら codex の `thread_id`・claude の `session_id`、取れなければ `pid:<番号>` (script が拾う) |
+| exit | `run` は script が終了コードを取る。subagent は終了コードが無いので `exit_status: null` と理由 (`exit_note`) を記録する。「返事が返り、結果の file がある = 正常終了」として扱う決まり |
+| 結果 | `review/review-<n>.md` (終了時点の sha256・更新時刻を記録) |
 
-別プロセスの時は、その実行記録 (`review/run-<n>.jsonl` など) も残す。記録に無いことを「やった」と書かない。
+別プロセスの出力 (`review/run-<n>.jsonl`・`run-<n>.stderr.log`) は `run` が残す。subagent の実行記録の file があれば `finish --transcript <file>` で渡すと、記録が強くなる。
+
+限界: 記録が示すのは「script が起動・時刻・出力・sha256 を取った」ところまで。subagent が作り手の会話を引き継いでいないことは記録からは分からない (だから上の「独立と言える条件」と起動の仕方を守る)。JSON を手で偽造することは防げない — 手で書かない・直さないのは進行役の決まり。
 
 ## 起動の仕方
 
 ### Claude Code
 
-- 既定: subagent を 1 つ起動する。会話の文脈を引き継がない種類を選ぶ (今の会話を複製する起動の仕方は使わない)。依頼の本文は短く、`review/request-<n>.md` を読んで従うこと、と 3 つの path だけを書く。モデルは作り手と同じ上位 (Opus 5.5、effort high) でよい。
-- 返ってきた subagent の id と、起動前後の時刻を独立の記録に書く。
-- 代わり: subagent が使えない時は、新しいプロセスとして非対話モード (`claude -p`) で依頼文を渡す。事前に道具の許可を与えないと止まるので、読み取り・`python3` の実行・Web 取得・`review/` への書き込みだけを許可する。出力を `review/run-<n>.json` に保存し、method は `fresh-process`、pid と終了コードを記録する。
+- 既定: subagent を 1 つ起動する。会話の文脈を引き継がない種類を選ぶ (今の会話を複製する起動の仕方は使わない)。依頼の本文は短く、`review/request-<n>.md` を読んで従うこと、と 3 つの path だけを書く。モデルは作り手と同じ上位でよい (`adapters.md` §1)。
+- 起動の直前に `review_record.py start review --round <n>`、返事が返った直後に `review_record.py finish review --round <n> --reviewer-id <subagent の id>` を実行する。時刻は script が取る。
+- 代わり: subagent が使えない時は、新しいプロセスとして非対話モード (`claude -p`) で依頼文を渡す。事前に道具の許可を与えないと止まるので、読み取り・`python3` の実行・Web 取得・`review/` への書き込みだけを許可する。`review_record.py run` に包んで起動すると、時刻・pid・終了コード・出力を script が記録する (method は `fresh-process`):
+
+```
+python3 <skill>/scripts/review_record.py run review --round <n> --stdin review/request-<n>.md -- \
+  claude -p --output-format json --allowedTools "Read,Write,Bash(python3:*),WebFetch"
+```
 
 ### Codex
 
@@ -153,19 +168,19 @@ spec_rev: <n>
 - 迷ったら、または subagent が使えない時は、新しい `codex exec` プロセスを起動する。分離が実行記録で示せる。案件フォルダに移ってから:
 
 ```
-codex exec --json --skip-git-repo-check -C . -s workspace-write \
-  -c model_reasoning_effort="high" -o review/last-<n>.md - \
-  < review/request-<n>.md > review/run-<n>.jsonl
-echo "exit=$?"
+python3 <skill>/scripts/review_record.py run review --round <n> --stdin review/request-<n>.md -- \
+  codex exec --json --skip-git-repo-check -C . -s workspace-write \
+  -c model_reasoning_effort="high" -o review/last-<n>.md -
 ```
 
-  - reviewer は依頼文に従って `review/review-<n>.md` を自分で書く。`-o` は最後の返事を別の file (`last-<n>.md`) に残すだけ (review file を上書きさせない)。`--json` の出力 (`run-<n>.jsonl`) が実行記録になる。起動の前後の時刻 (`date` で控える)・reviewer の識別子 (`run-<n>.jsonl` の 1 行目 `thread.started` の `thread_id`。pid を取れるならそれも)・終了コード (`echo "exit=$?"` の値) を独立の記録に書く。method は `fresh-process`。
+  - `codex exec` を `review_record.py run` に包む。`> review/run-<n>.jsonl` や `echo "exit=$?"` は要らない: 標準出力は `review/run-<n>.jsonl`、標準エラーは `review/run-<n>.stderr.log` に script が残し、時刻・pid・終了コードも script が記録する。reviewer の識別子は、出力の `thread.started` の `thread_id` を script が拾う。method は `fresh-process`。
+  - reviewer は依頼文に従って `review/review-<n>.md` を自分で書く。`-o` は最後の返事を別の file (`last-<n>.md`) に残すだけで、`check.py review-evidence` は見ない (review file を上書きさせないための指定)。
   - workspace-write の既定ではネットに出られないことがある。原典を開き直させたい時は `-c sandbox_workspace_write.network_access=true` を足す (Codex CLI 0.163 の設定項目にあることを確認済み。版が違う時は効くか確かめる)。効かなければ `sources/` だけで点検させ、結果に「原典の開き直しはしていない」と書かせる。
 
 ### どちらも使えない時
 
 機械チェックを作り手が実行し、作り手自身でも A〜F を点検してよい。ただしその結果は「未検品」として扱い、
-- `out/` の file 名に `_未検品` を付ける (例 `deck_未検品.pptx`)、
+- 渡す file には `_未検品` を付けた複製を作る (例 `cp out/deck.pptx out/deck_未検品.pptx`。`out/` の元の file は改名しない — `out/manifest.json` の記録と合わなくなる。`build.py` に名前を変える option は無い)。この場合 `check.py manifest out review` は「未検品」で FAIL するのが正しい動き (渡してよいのは「未検品」と明記した時だけ)、
 - `versions.md` の状態を「未検品」にする、
 - 最後の報告に「別の目での点検ができませんでした。理由: <>。ご自身で特に [要確認] と数字を確かめてからお使いください」と書く。
 
@@ -192,6 +207,6 @@ echo "exit=$?"
 - 証拠を見ずに完了と言わない: obra/superpowers `verification-before-completion` (MIT)
 - 作り手の申告は証拠ではない: BMAD-METHOD `claims-check` (MIT)
 - 受け手になって読む点検: anthropics/skills `doc-coauthoring` の Reader Testing の考え方 (文言は使っていない)
-- 機械抽出の結果を判定の入力にし、実行記録の無い判定を無効にする、点検役に渡す物を絞る、直しは 2 巡までで人に返す: 提供者 (A&A) の社内の検品手順と注意力設計を一般化
+- 機械抽出の結果を判定の入力にし、実行記録の無い判定を無効にする、点検役に渡す物を絞る、直しは 2 巡までで人に返す: 提供者の社内の検品手順と注意力設計を一般化
 - Codex の subagent の既定: https://learn.chatgpt.com/docs/agent-configuration/subagents (2026-10-18 取得)
 - `codex exec` の option: Codex CLI の `codex exec --help` (0.163、2026-10-18 時点)
