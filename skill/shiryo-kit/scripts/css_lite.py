@@ -1,15 +1,15 @@
 """shiryo-kit: HTML デッキの <style> を標準ライブラリだけで読む、小さな CSS の読み手。
 
 ブラウザを使わない書き出し（html_to_pptx_static.py）と、静的な読み取り（deck_html.py の「見えない文字」の判定）が使う。
-対応: タグ・.class・#id・:not(.x)・:first-child・:last-child・[属性] の組み合わせ、子孫（空白）と子（>）の結合、
-変数（--x と var(--x)）、詳細度の順。@media・@page などの @ の塊と、対応しない書き方（:has・::before など）の規則は読まない。
+対応: タグ・.class・#id・:not(.x)・:root・:first-child・:last-child・[属性] の組み合わせ、子孫（空白）と子（>）の結合、
+変数（--x と var(--x)。当たる要素から子へ受け継ぐ。:root・html の値が文書の既定）、詳細度の順。@media・@page などの @ の塊と、対応しない書き方（:has・::before など）の規則は読まない。
 """
 import re
 
 _COMMENT = re.compile(r"/\*.*?\*/", re.S)
 _SIMPLE = re.compile(r"(?P<tag>^[a-zA-Z][a-zA-Z0-9-]*|^\*)?(?P<rest>.*)$")
 _PART = re.compile(r"\.(?P<cls>[\w-]+)|#(?P<id>[\w-]+)|:not\(\.(?P<not>[\w-]+)\)|:(?P<pseudo>first-child|last-child)"
-                   r"|\[(?P<attr>[\w-]+)(?:=\"?(?P<val>[^\]\"]*)\"?)?\]")
+                   r"|:(?P<root>root)\b|\[(?P<attr>[\w-]+)(?:=\"?(?P<val>[^\]\"]*)\"?)?\]")
 
 
 class Rule:
@@ -24,7 +24,7 @@ def _compound(s):
     m = _SIMPLE.match(s)
     tag = (m.group("tag") or "").lower()
     rest = m.group("rest")
-    c = {"tag": "" if tag == "*" else tag, "cls": [], "id": [], "not": [], "pseudo": [], "attr": []}
+    c = {"tag": "" if tag == "*" else tag, "cls": [], "id": [], "not": [], "pseudo": [], "attr": [], "root": False}
     pos = 0
     while pos < len(rest):
         pm = _PART.match(rest, pos)
@@ -33,6 +33,8 @@ def _compound(s):
         for k in ("cls", "id", "not", "pseudo"):
             if pm.group(k):
                 c[k].append(pm.group(k))
+        if pm.group("root"):
+            c["root"] = True
         if pm.group("attr"):
             c["attr"].append((pm.group("attr"), pm.group("val")))
         pos = pm.end()
@@ -56,7 +58,7 @@ def _selector(sel):
     if not chain:
         return None
     spec = (sum(len(c["id"]) for _, c in chain),
-            sum(len(c["cls"]) + len(c["not"]) + len(c["pseudo"]) + len(c["attr"]) for _, c in chain),
+            sum(len(c["cls"]) + len(c["not"]) + len(c["pseudo"]) + len(c["attr"]) + c["root"] for _, c in chain),
             sum(1 for _, c in chain if c["tag"]))
     return chain, spec
 
@@ -74,8 +76,15 @@ def parse_decls(body):
     return out
 
 
+def _is_document(chain):
+    """:root・html だけの selector（文書全体の既定の変数を置く所）。"""
+    return len(chain) == 1 and (chain[0][1]["root"] or chain[0][1]["tag"] == "html") and not any(
+        chain[0][1][k] for k in ("cls", "id", "not", "pseudo", "attr"))
+
+
 def parse_css(text):
-    """CSS 文字列 → [Rule]（詳細度・出現順で並べたもの）と 変数の辞書。"""
+    """CSS 文字列 → [Rule]（詳細度・出現順で並べたもの）と 文書の既定の変数（:root・html の規則の --x）の辞書。
+    .skin-cool{--navy:…} のように要素に当たって初めて効く変数は、ここには入れない（cascade が当たる要素から受け継がせる）。"""
     text = _COMMENT.sub("", text)
     rules, variables, order = [], {}, 0
     i, n = 0, len(text)
@@ -96,9 +105,6 @@ def parse_css(text):
             break
         decls = parse_decls(text[j + 1:k])
         i = k + 1
-        for name, v in decls.items():
-            if name.startswith("--"):
-                variables[name] = v
         for sel in head.split(","):
             parsed = _selector(sel)
             if parsed is None:
@@ -106,11 +112,16 @@ def parse_css(text):
             order += 1
             rules.append(Rule(parsed[0], decls, parsed[1], order))
     rules.sort(key=lambda r: (r.spec, r.order))
+    for r in rules:
+        if _is_document(r.chain):
+            variables.update({k: v for k, v in r.decls.items() if k.startswith("--")})
     return rules, variables
 
 
 def _match_compound(c, node):
     if c["tag"] and node.tag != c["tag"]:
+        return False
+    if c["root"] and node.tag != "html":
         return False
     cls = node.classes
     if any(x not in cls for x in c["cls"]) or any(x in cls for x in c["not"]):
@@ -154,15 +165,24 @@ def resolve_var(v, variables, depth=0):
     return resolve_var(re.sub(r"var\(\s*(--[\w-]+)\s*(?:,\s*([^()]*(?:\([^()]*\))?[^()]*))?\)", rep, v), variables, depth + 1)
 
 
-def computed(rules, variables, node):
-    """node に当たる宣言を詳細度の順に重ねた辞書（style 属性が最後）。"""
+def cascade(rules, variables, node, inherited=None):
+    """node に当たる宣言を詳細度の順に重ねた辞書（style 属性が最後）と、node で効いている変数。
+    変数は親の変数（inherited。根では文書の既定 variables）に、node に当たる規則の --x を重ねたもの。子へ渡す。"""
     out = {}
     for r in rules:
         if matches(r.chain, node):
             out.update(r.decls)
     if node.attrs.get("style"):
         out.update(parse_decls(node.attrs["style"]))
-    return {k: resolve_var(v, variables) for k, v in out.items() if not k.startswith("--")}
+    parent = variables if inherited is None else inherited
+    own = dict(parent)
+    # 変数の中の var() は、宣言した要素で解く（:root{--b:var(--a)} は :root の --a。子で --a を変えても --b は変わらない）
+    own.update({k: resolve_var(v, parent) for k, v in out.items() if k.startswith("--")})
+    return {k: resolve_var(v, own) for k, v in out.items() if not k.startswith("--")}, own
+
+
+def computed(rules, variables, node, inherited=None):
+    return cascade(rules, variables, node, inherited)[0]
 
 
 def is_hidden(decls):
@@ -172,6 +192,8 @@ def is_hidden(decls):
 
 
 def style_text(html):
+    """<style> の中身。HTML のコメントの中の「<style>」の字は数えない（部品集の冒頭の説明文など）。"""
+    html = re.sub(r"<!--.*?-->", "", html, flags=re.S)
     return "\n".join(re.findall(r"<style\b[^>]*>(.*?)</style>", html, flags=re.S | re.I))
 
 

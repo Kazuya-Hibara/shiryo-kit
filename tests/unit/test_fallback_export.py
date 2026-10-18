@@ -317,6 +317,97 @@ class StaticCss(unittest.TestCase):
              "<div class='slide'><h1>スライド2</h1></div></body></html>")
         self.assertEqual([s.text for s in parse_deck(h).slides], ["表紙の題", "本文", "スライド2"])
 
+    def test_variables_follow_selector_and_inheritance(self):
+        """RT-CC-1: どの要素にも当たらない .skin-cool の --navy が :root の値を上書きしない。当たる所では効く。"""
+        from html_to_pptx_static import Styler, _Tree, _mark_siblings
+        h = ("<html><head><style>:root{--navy:#322014;--ink:#111111}h1{color:var(--navy)}p{color:var(--ink)}"
+             ".skin-cool{--navy:#071b2c}.dark{--ink:#eeeeee}</style></head><body>"
+             "<main class='deck'><section class='s'><h1>茶</h1><p>黒</p></section></main>"
+             "<main class='deck skin-cool'><section class='s'><h1>紺</h1><p style='--ink:#ff0000'>赤</p></section></main>"
+             "</body></html>")
+        t = _Tree()
+        t.feed(h)
+        t.close()
+        _mark_siblings(t.root)
+        Styler(h).apply(t.root)
+        got = {}
+
+        def walk(n):
+            for c in n.elements():
+                if c.tag in ("h1", "p"):
+                    got["".join(x for x in c.children if isinstance(x, str))] = c.font["color"]
+                walk(c)
+        walk(t.root)
+        self.assertEqual(got, {"茶": "#322014", "黒": "#111111", "紺": "#071b2c", "赤": "#ff0000"})
+
+    @unittest.skipUnless(HAS_PPTX, "python-pptx が無い")
+    def test_claims_fallback_keeps_root_palette(self):
+        """claims の deck: :root は茶 (#322014)、使われない .skin-cool は紺。予備の書き出しの見出しは茶のまま。"""
+        from html_to_pptx_static import dump
+        colors = {r["color"] for sl in dump(CLAIMS)["slides"] for it in sl.get("items", [])
+                  for p in it.get("paras", []) for r in p.get("runs", [])}
+        self.assertIn("#322014", colors)
+        self.assertNotIn("#071b2c", colors)
+
+    def test_flex_space_between_puts_last_item_at_right_edge(self):
+        """RT-CC-2: 見出しの帯・足もとの justify-content:space-between。ページ番号は右端、題は 1 行のまま。
+        visibility:hidden の子も場所は取る（帯の題を隠した枚でも右の札は右端）。flex:1 の子は従来どおり等分。"""
+        from html_to_pptx_static import dump
+        css = ("<style>.s{width:960pt;height:540pt;padding:0 40pt}.bar,.foot,.row{display:flex;justify-content:space-between}"
+               ".logo{font-size:18pt}.date{font-size:8pt}.hide .logo{visibility:hidden}.row>div{flex:1}</style>")
+        h = ("<html><head>" + css + "</head><body>"
+             "<section class='s'><div class='bar'><div class='logo'>パート・アルバイトの社会保険、これからどこまで広がる?</div>"
+             "<div class='date'>サンプル会員向けセミナー</div></div>"
+             "<div class='foot'><b>題の繰り返し</b><span>12</span></div></section>"
+             "<section class='s hide'><div class='bar'><div class='logo'>隠れる題</div><div class='date'>はじめに</div></div>"
+             "<div class='row'><div>左</div><div>右</div></div></section></body></html>")
+        with TempDir() as d:
+            (d / "deck.html").write_text(h, encoding="utf-8")
+            slides = dump(d / "deck.html")["slides"]
+
+        def box(sl, text):
+            return next(it for it in sl["items"] if it["t"] == "text"
+                        and "".join(r["text"] for p in it["paras"] for r in p["runs"]) == text)
+        right = 960 - 40
+        for sl, text in ((slides[0], "サンプル会員向けセミナー"), (slides[0], "12"), (slides[1], "はじめに")):
+            b = box(sl, text)
+            self.assertAlmostEqual(b["x"] + b["w"], right, delta=1.0, msg=text)
+            self.assertEqual(b["paras"][0]["align"], "right", text)
+        self.assertEqual(box(slides[0], "パート・アルバイトの社会保険、これからどこまで広がる?")["lines"], 1)
+        left, rgt = box(slides[1], "左"), box(slides[1], "右")
+        self.assertAlmostEqual(left["w"], rgt["w"], delta=1.0)
+        self.assertLess(rgt["x"], 600)
+
+    def test_style_in_html_comment_is_ignored(self):
+        """部品集の冒頭のコメントに「<style> 冒頭の :root トークン」とあっても、本物の :root の色を読む（F4 の点検 M2）。"""
+        from html_to_pptx_static import dump
+        colors = set()
+        for it in (x for sl in dump(PARTS / "freeform_parts_16x9.html")["slides"] for x in sl["items"]):
+            if it["t"] == "rect":
+                colors.add(it.get("fill"))
+            for p in it.get("paras", []):
+                colors.update(r["color"] for r in p["runs"])
+        self.assertIn("#322014", colors)
+
+    def test_flex_row_keeps_image_and_explicit_width(self):
+        """justify-content の横並びでも、画像（ロゴ）と幅の指定のある子は縮めない（F4 の点検 M3）。1 つだけの子は flow のまま。"""
+        from html_to_pptx_static import dump
+        png = (SCRIPTS.parent / "assets" / "kata" / "seminar" / "preview.png").resolve()
+        h = ("<html><head><style>.s{width:960pt;height:540pt;padding:0 40pt}.bar{display:flex;justify-content:space-between}"
+             ".w60{width:60%}.one{display:flex;justify-content:center}</style></head><body>"
+             f"<section class='s'><div class='bar'><img src='{png}' style='width:200pt'><span>12</span></div>"
+             "<div class='bar'><div class='w60'>幅を決めた題の文字はこれくらいの長さ</div><div>右</div></div>"
+             "<div class='one'><h1>中央の題</h1></div></section></body></html>")
+        with TempDir() as d:
+            (d / "deck.html").write_text(h, encoding="utf-8")
+            items = dump(d / "deck.html")["slides"][0]["items"]
+        img = next(it for it in items if it["t"] == "img")
+        self.assertGreater(img["w"], 150)
+        title = next(it for it in items if it["t"] == "text" and it["paras"][0]["runs"][0]["text"].startswith("幅を決めた"))
+        self.assertEqual(title["lines"], 1)
+        h1 = next(it for it in items if it["t"] == "text" and it["paras"][0]["runs"][0]["text"] == "中央の題")
+        self.assertEqual(h1.get("role"), "title")
+
     def test_skip_marker_reaches_reading_script_md(self):
         from build import notes_markdown
         from deck_html import parse_deck

@@ -61,6 +61,13 @@ RX = {
 }
 
 
+# 出典の URL (法令番号・資料の番号が入る) と e-Gov の法令番号 (「322AC0000000049」) は、数字の検査から外す。
+# URL は ASCII の URL の字だけで区切る (後に空白なしで続く和文・電話番号まで URL に含めない)。URL の中のメールアドレスは別に拾う
+URL = re.compile(r"(?:https?://|www\.)[A-Za-z0-9\-._~:/?#\[\]@!$&*+,;=%]+")
+LAW_NO = re.compile(r"(?<![0-9A-Za-z])\d{3}[A-Z]{1,2}\d{10}(?![0-9])")
+DIGIT_KINDS = ("phone", "postal", "mynumber")
+
+
 def load_allow(paths):
     words = []
     for p in paths:
@@ -99,8 +106,9 @@ def scan_text(text, allow=()):
     lines = text.splitlines()
     name_lines = set()
     for i, line in enumerate(lines, 1):
+        no_url = LAW_NO.sub(lambda m: " " * len(m.group(0)), URL.sub(lambda m: " " * len(m.group(0)), line))
         for kind in ("email", "phone", "postal", "address", "mynumber", "org"):
-            for m in RX[kind].finditer(line):
+            for m in RX[kind].finditer(no_url if kind in DIGIT_KINDS else line):
                 s = m.group(0)
                 if kind == "mynumber" and RX["phone"].fullmatch(s):
                     continue

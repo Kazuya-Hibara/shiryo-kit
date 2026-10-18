@@ -14,7 +14,16 @@ POSITIVE = {
 }
 NAMES = ["田中様から相談", "佐藤さんの件", "氏名: 鈴木一郎", "山田太郎が担当"]
 NEGATIVE = ["皆様へのお知らせ", "お客様の声", "同様の手続き", "仕様の変更", "ご担当者様", "社長さんに確認", "先生方へ",
-            "パートさんの所定労働時間", "賃金の額に関係なく対象", "障害年金の制度の説明"]
+            "パートさんの所定労働時間", "賃金の額に関係なく対象", "障害年金の制度の説明",
+            # 出典の URL の中の数字は電話番号・マイナンバーではない (RT-CC-3: e-Gov の法令番号を電話と誤認)
+            "出典: https://laws.e-gov.go.jp/law/322AC0000000049 (原典の確認日 2026年10月18日)",
+            "https://www.mhlw.go.jp/content/000123456789.pdf", "法令番号 322AC0000000049"]
+# URL を外しても、URL の外・tel: の電話番号は拾い続ける
+PHONE_STILL = ["電話0312345678", "TEL:03-1234-5678", "tel:0312345678", "詳しくは https://example.com/a 090-0000-1234 まで",
+               # URL の後に空白なしで和文が続いても、その先の電話番号は拾う (URL を和文まで伸ばさない)
+               "（https://example.com、電話03-1234-5678）", "詳細はhttps://example.com/infoまたは電話0312345678へ",
+               "https://example.com/お問い合わせ。TEL03-1234-5678", "www.example.jpの担当090-1234-5678",
+               "受付3F03-1234-5678"]
 
 
 class Pii(unittest.TestCase):
@@ -34,6 +43,10 @@ class Pii(unittest.TestCase):
     def test_negatives_not_flagged(self):
         for text in NEGATIVE:
             self.assertEqual(scan_text(text), [], text)
+
+    def test_phone_outside_url_still_found(self):
+        for text in PHONE_STILL:
+            self.assertIn("phone", [k for _, k, _ in scan_text(text)], text)
 
     def test_allowlist(self):
         self.assertEqual(scan_text("柏木様の事務所", allow=["柏木"]), [])

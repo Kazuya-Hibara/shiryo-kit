@@ -35,12 +35,12 @@ MIN_SCALE = 0.55
 
 # ---------------------------------------------------------------- 木
 class Node:
-    __slots__ = ("tag", "attrs", "classes", "children", "parent", "first", "last", "style", "font")
+    __slots__ = ("tag", "attrs", "classes", "children", "parent", "first", "last", "style", "font", "vars")
 
     def __init__(self, tag, attrs, parent):
         self.tag, self.attrs, self.parent = tag, attrs, parent
         self.classes = set((attrs.get("class") or "").split())
-        self.children, self.first, self.last, self.style, self.font = [], None, None, {}, {}
+        self.children, self.first, self.last, self.style, self.font, self.vars = [], None, None, {}, {}, None
 
     def elements(self):
         return [c for c in self.children if isinstance(c, Node)]
@@ -116,7 +116,7 @@ class Styler:
         self.rules, self.vars = css_lite.parse_css(css_lite.style_text(html))
 
     def apply(self, n):
-        n.style = css_lite.computed(self.rules, self.vars, n)
+        n.style, n.vars = css_lite.cascade(self.rules, self.vars, n, n.parent.vars if n.parent is not None else None)
         p = n.parent.font if n.parent is not None and n.parent.font else {
             "size": DEFAULT_SIZE, "bold": False, "italic": False, "color": "#222222", "serif": False, "lh": 1.5,
             "align": "left"}
@@ -156,6 +156,33 @@ class Styler:
         n.font = f
         for ch in n.elements():
             self.apply(ch)
+
+
+JUSTIFY = {"space-between", "space-around", "space-evenly", "center", "flex-end", "end", "right"}
+
+
+def _takes_space(n):
+    """場所を取る子（display:none・hidden 属性・ノートなどは取らない。visibility:hidden は取る）。"""
+    return not (n.style.get("display", "").strip().lower() == "none" or "hidden" in n.attrs or n.tag in SKIP
+                or (n.tag == "aside" and "notes" in n.classes))
+
+
+def _grows(n):
+    """flex-grow が 0 より大きい子（flex: 1・flex: auto など）。"""
+    g = (n.style.get("flex-grow") or n.style.get("flex") or "").strip().lower().split()
+    if not g or g[0] == "none":
+        return False
+    return g[0] == "auto" or (re.match(r"^[\d.]+$", g[0]) is not None and float(g[0]) > 0)
+
+
+def _sized(n):
+    """幅が文字の長さで決まらない子（画像・図、width・min-width・flex-basis の指定）。中に画像・図を持つ子も。"""
+    if n.tag in ("img", "svg") or any(n.style.get(k) for k in ("width", "min-width", "flex-basis")):
+        return True
+    fl = n.style.get("flex", "").split()
+    if len(fl) == 3 and fl[2] not in ("auto", "content", "0", "0%") and css_lite.length_pt(fl[2], 12) is not None:
+        return True  # flex: 0 0 120px の 3 つ目（basis）
+    return any(_sized(c) for c in n.elements() if c.tag in ("img", "svg") or c.elements())
 
 
 def hidden(n):
@@ -361,6 +388,9 @@ class Layout:
             h = self.text_box([[run_of("（図）" + "　".join(labels), dict(f, size=f["size"] * 0.9))]], ix, iy, iw, f) if labels else 0
         elif n.tag == "img":
             h = self.image(n, ix, iy, iw)
+        elif (disp.endswith("flex") and "column" not in n.style.get("flex-direction", "")
+              and (h := self.justified(n, ix, iy, iw)) is not None):
+            pass
         elif (disp.endswith("grid") or (disp.endswith("flex") and "column" not in n.style.get("flex-direction", ""))) \
                 and len([c for c in n.elements() if not hidden(c)]) >= 2:
             h = self.columns(n, ix, iy, iw, disp)
@@ -474,6 +504,56 @@ class Layout:
             ww = hh * px_w / max(1, px_h)
         self.items.append({"t": "img", "file": str(p.resolve()), "x": x, "y": y, "w": ww, "h": hh})
         return hh
+
+    def justified(self, n, x, y, w):
+        """justify-content で寄せる横並び（見出しの帯・足もとの題とページ番号など）。どの子も伸びない時だけ、子を中身の幅にして
+        ブラウザと同じ所に置く。右端に寄る子の字は右揃え。visibility:hidden の子は描かないが場所は取る。
+        当てはまらない・1 行に収まらない時は None（columns・flow の等分に任せる）。"""
+        jc = n.style.get("justify-content", "").strip().lower()
+        if jc not in JUSTIFY or "wrap" in n.style.get("flex-wrap", ""):
+            return None
+        if any(isinstance(c, str) and c.strip() for c in n.children):
+            return None  # 地の文が直に入る横並び（文 + 参照の札など）は flow に任せる
+        kids = [c for c in n.elements() if _takes_space(c)]
+        if len(kids) < 2 or not any(not hidden(c) for c in kids) or any(_grows(c) or _sized(c) for c in kids):
+            return None  # 子が 1 つ・伸びる子・画像や幅の指定のある子は、文字の幅では決められない
+        gap_v = (n.style.get("column-gap") or n.style.get("gap") or "").split()
+        gap = (css_lite.length_pt(gap_v[-1], n.font["size"]) or 0.0) * self.k if gap_v else 0.0
+        ws = [max(24.0, self._line_w(c)) for c in kids]  # text_box の最小の幅と同じ
+        free = w - sum(ws) - gap * (len(kids) - 1)
+        if free < 0:
+            return None
+        m = len(kids)
+        start, extra = {"space-between": (0.0, free / (m - 1) if m > 1 else 0.0),
+                        "space-around": (free / m / 2, free / m), "space-evenly": (free / (m + 1), free / (m + 1)),
+                        "center": (free / 2, 0.0)}.get(jc, (free, 0.0))  # flex-end・end・right
+        cx, h = x + start, 0.0
+        for i, (c, cw) in enumerate(zip(kids, ws)):
+            at_right = jc in ("flex-end", "end", "right") or (jc == "space-between" and m > 1 and i == m - 1)
+            first = len(self.items)
+            if not hidden(c):
+                h = max(h, self.block(c, cx, y, cw, "flex"))
+            if at_right:
+                for it in self.items[first:]:
+                    for q in it.get("paras", []) if it["t"] == "text" else []:
+                        if q["align"] in ("left", "start"):
+                            q["align"] = "right"
+            cx += cw + gap + extra
+        return h
+
+    def _line_w(self, n):
+        """n の中身を折り返さずに 1 行に並べた幅（pt、左右の余白を含む）。少しゆとりを足す（LibreOffice の字は広め）。"""
+        def walk(e):
+            tot = 0.0
+            for c in e.children:
+                if isinstance(c, str):
+                    tot += text_em(re.sub(r"\s+", " ", c)) * e.font["size"]
+                elif _takes_space(c):
+                    pad = side(c, "padding", c.font["size"])
+                    tot += walk(c) + pad[1] + pad[3]
+            return tot
+        pad = side(n, "padding", n.font["size"])
+        return (walk(n) * 1.06 + pad[1] + pad[3]) * self.k + 2.0
 
     def columns(self, n, x, y, w, disp):
         kids = [c for c in n.elements() if not hidden(c)]

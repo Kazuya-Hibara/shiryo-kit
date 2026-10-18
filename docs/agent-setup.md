@@ -1,7 +1,7 @@
 # エージェント版の準備と使い方 (Claude Code・Codex をお使いの方向け)
 
-このページは、**Claude Code か Codex を既に使っている方 (または入れてもよい方)** 向けです。README の「ほかの使い方」の 2 番目にあたります。
-ターミナルや GitHub が初めての方は、このページは読まなくてかまいません。まず [README の「おすすめの使い方」](../README.md#おすすめの使い方--claude-か-chatgpt-のアプリにスキルとして入れる) (Claude の Cowork か ChatGPT の Work に、スキルの ZIP を入れる) をご覧ください。それも使えない時の予備が [チャット版](../chat/README.md) (ふだんの ChatGPT・Claude・Gemini に指示文を貼るだけ) です。
+このページは、**Claude Code か Codex を使う方 (または入れてもよい方)** 向けです。README の「ほかの使い方」の 2 番目にあたります。ターミナル (黒い画面) を使ったことが無くても、Claude のデスクトップアプリなら、このページの手順で使えます (下の §0)。
+Claude の Cowork か ChatGPT の Work が使えるなら、そちらの方が簡単です ([README の「おすすめの使い方」](../README.md#おすすめの使い方--claude-か-chatgpt-のアプリにスキルとして入れる)。スキルの ZIP を入れるだけ)。どれも使えない時の予備が [チャット版](../chat/README.md) (ふだんの ChatGPT・Claude・Gemini に指示文を貼るだけ) です。
 中身のスキルは、おすすめの使い方と同じものです。このページの方法では、スライドを Chrome で描いて、はみ出し・重なりを確かめてから PowerPoint にします (Chrome が使えない時は、確認の無い予備の書き出しになります)。
 
 道具の全体の説明・見本・限界は [README](../README.md) にあります。
@@ -32,12 +32,12 @@
 やり方は 2 つあります。どちらも、することは同じです。
 
 **やり方 A — AI に頼む (おすすめ)**
-Claude Code か Codex を、展開したフォルダ (`shiryo-kit-main` など) で開きます。Claude のデスクトップアプリなら、上の「Code」タブで「Select folder」を押して、このフォルダを選びます。ChatGPT のデスクトップアプリ (Codex) なら、Codex を選んでフォルダを開きます。開いたら、次のように頼みます。
+Claude Code か Codex を、展開したフォルダ (`shiryo-kit-main` など) で開きます。Claude のデスクトップアプリなら、上の「Code」タブで「Select folder」を押して、このフォルダを選びます。ChatGPT のデスクトップアプリ (Codex) なら、Codex を選んでフォルダを開きます (フォルダを選ぶボタンの画面上の名前は未確認です)。開いたら、次のように頼みます。
 
 - Claude Code なら「このフォルダの install.sh を --claude を付けて実行して」(Windows は「install.ps1 を -Claude を付けて実行して」)
 - Codex なら「このフォルダの install.sh を --codex を付けて実行して」(Windows は「install.ps1 を -Codex を付けて実行して」)
 
-AI がコマンドを実行してよいかを確かめてきたら、許可してください (Codex は、作業中のフォルダの外 (スキルの置き場所) に書き込むので、たいてい確かめてきます)。
+AI がコマンドを実行してよいかを確かめてきたら、許可してください (Codex は、作業中のフォルダの外 (スキルの置き場所) に書き込むので、たいてい確かめてきます)。このコマンドは、`skill/shiryo-kit` フォルダをスキルの置き場所にコピーするだけで、他のスキルや設定には触りません (詳しくは下のやり方 B の後)。
 うまくいくと、AI の返事か画面に「[Claude Code] コピーしました: …」(または「[Codex] コピーしました: …」、2 回目以降は「新しい版に入れ替えました」) と「終わりました。」が出ます。「止めました」と出た時は、下の「うまくいかない時」をご覧ください。
 
 **やり方 B — 自分でコマンドを打つ**
@@ -69,11 +69,11 @@ Windows の `-ExecutionPolicy Bypass` は、「ダウンロードしたスクリ
 
 ### 2. 初めて使う時に、AI が準備するもの
 
-PowerPoint と PDF を書き出すために、次のものが要ります。足りない物があると、AI が「何を・なぜ入れるか」を説明して、**あなたの了承を得てから** 入れます。どれも、プログラムを動かすための土台の部品で、無料です。Node.js と Chrome を断った・使えない場合は、Python の部品だけで作る予備の書き出しになります (文字は直せる PowerPoint ですが、見た目の確認はしていません。PDF は LibreOffice があれば作ります)。Python の部品 (python-pptx) も断った場合は、作った資料をブラウザで見るページ (HTML) のまま渡し、PDF にする手順を案内します。
+PowerPoint と PDF を書き出すために、次のものが要ります。足りない物があると、AI が「何を・なぜ入れるか」を説明して、**あなたの了承を得てから** 入れます (入れる操作は、ふつうは AI がします。Mac で brew が無い時の Node.js だけは、AI の案内に沿ってあなたが公式サイトから入れます)。どれも、プログラムを動かすための土台の部品で、無料です。**編集できる PowerPoint を、はみ出し・重なりの確認つきで作るなら、許可するのがおすすめです。**Node.js と Chrome を断った・使えない場合は、Python の部品だけで作る予備の書き出しになります (文字は直せる PowerPoint ですが、見た目の確認はしていません。PDF は LibreOffice があれば作ります)。Python の部品 (python-pptx) も断った場合は、作った資料をブラウザで見るページ (HTML) のまま渡し、PDF にする手順を案内します。
 
 | 要るもの | 何に使うか | 入れ方の例 (AI が実行します) |
 |---|---|---|
-| Node.js 22 以上 | スライドを描いて、PowerPoint・PDF にする (無ければ予備の書き出し) | Mac: `brew install node` (brew は Mac にソフトを入れる道具。無ければ公式サイト https://nodejs.org/ から入れます) / Windows: `winget install OpenJS.NodeJS.LTS` |
+| Node.js 22 以上 | スライドを描いて、PowerPoint・PDF にする (無ければ予備の書き出し) | Mac: `brew install node` (brew は Mac にソフトを入れる道具。brew が無い時は、AI が公式サイト https://nodejs.org/ の入れ方を案内するので、あなたがそのページから入れます) / Windows: `winget install OpenJS.NodeJS.LTS` |
 | Google Chrome か Microsoft Edge | スライドを一度画面に描いて、文字の位置と大きさを測る | ふつうは既に入っています。Windows には Edge が最初から入っています |
 | Python 3.10 以上と、部品 python-pptx・lxml | PowerPoint のファイルを組み立てる・確かめる | Mac・Linux: shiryo-kit 専用の場所 (`~/.shiryo-kit-venv`) に入れます / Windows: `py -m pip install python-pptx lxml` |
 
@@ -103,6 +103,7 @@ AI には種類 (モデル) と、どれだけ考えてから答えるか (effor
    - 「この前のセミナー資料をもとに、読み原稿も付けて作り直して」
 
    名前で呼ぶこともできます (Claude Code は `/shiryo-kit`、Codex は `$shiryo-kit`)。
+3. **Codex をお使いなら:** 作業の途中で、Codex が「ネットにつないでよいか」「(Codex の安全のための) 囲いの外で実行してよいか」を確かめてくることがあります。**許可するのがおすすめです。** 原典を取りに行く時・PowerPoint を書き出す時・別の AI が点検する時に使います。断ると、出典が [要確認] になったり、PowerPoint が確認の無い予備の書き出しになったり、点検ができず「未検品」になったりします。
 
 ### 聴き取りはこんな感じです
 
