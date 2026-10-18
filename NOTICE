@@ -1,0 +1,42 @@
+shiryo-kit
+==========
+
+This product includes software derived from consulting-pptx-skill
+(https://github.com/carnot-tech/consulting-pptx-skill, commit bc9a587f, 2026-10-14),
+distributed under the MIT License. shiryo-kit is not affiliated with, endorsed by,
+or an official version of that project or its authors. Trademarks of the original
+authors are not used in the name of this product.
+
+Derived files (modified unless noted):
+  skill/shiryo-kit/scripts/html_to_pptx.py   speaker notes, neutral document properties, dependency messages
+  skill/shiryo-kit/scripts/html_dump.mjs     keeps the author's spaces between Japanese characters, never draws aside.notes, text export
+  skill/shiryo-kit/scripts/lib_cdp.mjs       Chrome/Edge/Chromium discovery (macOS/Windows/Linux), SHIRYO_CHROME_WAIT_MS, error messages
+  skill/shiryo-kit/scripts/check_deck.py     no hard-coded tool name, parts path, notes excluded, rule-document references removed
+  skill/shiryo-kit/scripts/new_deck.py       parts path, empty <aside class="notes"> per slide
+  skill/shiryo-kit/scripts/pptx_open.py      unchanged
+  skill/shiryo-kit/scripts/data/banned_phrases.txt   partly from the upstream AI-smell word list
+  skill/shiryo-kit/assets/parts/freeform_parts_16x9.html        default back-cover credit line removed
+  skill/shiryo-kit/assets/parts/freeform_parts_more_16x9.html   unchanged except header comment
+
+----------------------------------------------------------------------
+MIT License
+
+Copyright (c) 2026 Carnot AI Inc.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

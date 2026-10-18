@@ -1,0 +1,6 @@
+interface:
+  display_name: "shiryo-kit 資料づくり"
+  short_description: "聴き取りから始めて、出典を確かめた日本語のスライド・説明資料・読み原稿を作る"
+  default_prompt: "$shiryo-kit で資料を作りたいです。作り始める前に、まず必要なことを聴き取ってください。"
+policy:
+  allow_implicit_invocation: true
