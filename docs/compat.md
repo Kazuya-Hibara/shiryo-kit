@@ -73,7 +73,7 @@ Codex を WSL (Windows の中の Linux) で動かす時は、WSL の中の家の
 | U-02 | 書き出した pptx を実際の PowerPoint (Windows・Mac) で開いて、崩れと直しやすさ | README と agent-setup.md の「PowerPoint で開いた時の崩れは…」の段落と、各行の検証状況 |
 | U-03 | ChatGPT のデスクトップアプリの Annotate と、Claude のデスクトップアプリの要素選択で、実際に直せるか | agent-setup.md の「直したい時」の「未検証」と、対応環境の表の「使えない・弱い機能」 |
 | U-04 | 初めての士業の方 (同じような立場の 2〜3 名) が、迷わず使えるか・信用できると感じるか | README 全体の書き方と、各行の検証状況 |
-| U-05 | Claude の Cowork と ChatGPT の Work に `shiryo-kit-skill.zip` を入れ、入口から成果物まで通るか (スキルが入るか・Chrome が動くか、動かない時の予備の書き出し・PDF・別の AI による点検・メモの引き継ぎ) | README の「おすすめの使い方」の最初の注記 (ブラウザ版で通した・デスクトップアプリは未確認) と、対応環境の表の Cowork・Work の行 |
+| U-05 | Claude の Cowork と ChatGPT の Work に `shiryo-kit-skill.zip` を入れ、入口から成果物まで通るか (スキルが入るか・Chrome が動くか、動かない時の予備の書き出し・PDF・別の AI による点検・メモの引き継ぎ) | README の「おすすめの使い方」の最初の注記 (2026-10-19: ブラウザ版は 2 社とも成果物まで通した。Claude のデスクトップアプリは要約の承認まで確認・書き出しは未確認。ChatGPT のデスクトップアプリは ZIP を入れる入口が無く、Mac 上のスキルのフォルダを読む作りで、試した設定 (Approve for me) では Chrome と別の AI の点検が動かず予備の書き出し・未検品になった) と、対応環境の表の Cowork・Work の行。メモの引き継ぎは未確認 |
 
 あわせて、利用者テストの前に作った側が確かめておくこと (README の「未検証」は外さない):
 
